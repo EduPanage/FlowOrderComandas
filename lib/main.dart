@@ -8,16 +8,22 @@ import 'package:firebase_core/firebase_core.dart'; // Importa o núcleo do Fireb
 // import 'firebase_options.dart';
 
 // O ponto de entrada principal do aplicativo.
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 void main() async {
-  // Garante que os widgets do Flutter foram inicializados.
+  // Garante que o Flutter e o Firebase estão prontos antes de iniciar
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const MyApp());
+}
 
-  // Inicializa o Firebase antes de rodar o app.
-  // Substitua 'firebase_options.dart' pelo caminho correto se você usar esse arquivo.
-  // Se não, o Flutter CLI já deve ter feito a configuração necessária.
-  await Firebase.initializeApp();
-
-  runApp(const FlowOrderGarcomApp());
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const FlowOrderGarcomApp();
+  }
 }
 
 // Definindo as cores do tema para replicar a estética fornecida.
