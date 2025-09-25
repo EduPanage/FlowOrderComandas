@@ -1,13 +1,17 @@
+// lib/view/TelaLogin.dart
+
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:floworder/auxiliar/Cores.dart';
 import '../firebase/LoginFirebase.dart';
 
-class Tela_Login extends StatefulWidget {
+class TelaLogin extends StatefulWidget {
+  const TelaLogin({Key? key}) : super(key: key);
+
   @override
-  _telalogin createState() => _telalogin();
+  State<TelaLogin> createState() => _TelaLoginState();
 }
 
-class _telalogin extends State<Tela_Login> {
+class _TelaLoginState extends State<TelaLogin> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -33,198 +37,282 @@ class _telalogin extends State<Tela_Login> {
   Future<void> _checkAuthStatus() async {
     try {
       LoginFirebase loginFirebase = LoginFirebase();
-
       if (loginFirebase.isLoggedIn()) {
-        Navigator.pushReplacementNamed(context, '/mesas');
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao verificar status de autenticação: $e'),
+          backgroundColor: Cores.errorRed,
+        ),
+      );
+    }
+    setState(() {
+      _isCheckingAuth = false;
+    });
+  }
+
+  Future<void> _MudarSenha(String email) async {
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Por favor, insira seu e-mail'),
+          backgroundColor: Cores.errorRed,
+        ),
+      );
+      return;
+    }
+
+    try {
+      LoginFirebase loginFirebase = LoginFirebase();
+      String resultado = await loginFirebase.resetPassword(email);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(resultado)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao enviar e-mail de redefinição: $e'),
+          backgroundColor: Cores.errorRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      LoginFirebase loginFirebase = LoginFirebase();
+      String resultadoLogin = await loginFirebase.login(
+        _emailController.text,
+        _passwordController.text,
+      );
+
+      if (resultadoLogin == 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login realizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Usuário já está logado'),
-            backgroundColor: Colors.green,
+            content: Text(resultadoLogin),
+            backgroundColor: Cores.errorRed,
           ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao verificar status de autenticação: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Erro inesperado: $e'),
+          backgroundColor: Cores.errorRed,
         ),
       );
-    } finally {
-      setState(() {
-        _isCheckingAuth = false;
-      });
     }
-  }
 
-  Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      LoginFirebase loginFirebase = LoginFirebase();
-      String resultado = await loginFirebase.login(
-        _emailController.text,
-        _passwordController.text,
-      );
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (resultado == 'success') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login realizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushReplacementNamed(context, '/mesas');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(resultado),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isCheckingAuth) {
       return Scaffold(
+        backgroundColor: Cores.backgroundBlack,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(color: Cores.primaryRed),
         ),
       );
     }
 
     return Scaffold(
+      backgroundColor: Cores.backgroundBlack,
       body: Container(
         decoration: BoxDecoration(
-          color: Color(0xFF1C1C1C), // Cor de fundo
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Cores.backgroundBlack, Cores.darkGray, Cores.backgroundBlack],
+          ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Center(
-                      child: Text(
-                        'FlowOrder',
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLogoHeader(),
+                      const SizedBox(height: 40),
+                      Text(
+                        'Login',
                         style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFE53935),
-                          shadows: [
-                            BoxShadow(
-                              color: Colors.red.withOpacity(0.5),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Center(
-                      child: Text(
-                        'Garçom',
-                        style: TextStyle(
+                          color: Cores.textWhite,
                           fontSize: 24,
-                          color: Color(0xFFFDD835),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                    SizedBox(height: 48.0),
-                    _buildInputField(
-                      controller: _emailController,
-                      label: 'Email',
-                      icon: Icons.person_outline,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor, insira seu email';
-                        }
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: 16.0),
-                    _buildInputField(
-                      controller: _passwordController,
-                      label: 'Senha',
-                      icon: Icons.lock_outline,
-                      obscureText: _obscurePassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: Colors.white70,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
+                      const SizedBox(height: 8),
+                      Text(
+                        'FlowOrder - Comandas',
+                        style: TextStyle(color: Cores.textGray, fontSize: 16),
+                      ),
+                      const SizedBox(height: 40),
+                      _buildInputField(
+                        controller: _emailController,
+                        label: 'E-mail',
+                        icon: Icons.email,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor, insira seu e-mail';
+                          }
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                            return 'E-mail inválido';
+                          }
+                          return null;
                         },
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor, insira sua senha';
-                        }
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: 24.0),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isLoading ? Colors.grey : Color(0xFFE53935),
-                        padding: EdgeInsets.symmetric(vertical: 16.0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
+                      const SizedBox(height: 20),
+                      _buildInputField(
+                        controller: _passwordController,
+                        label: 'Senha',
+                        icon: Icons.lock,
+                        obscureText: _obscurePassword,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            color: Cores.textGray,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                         ),
-                        elevation: 5,
-                        shadowColor: Color(0xFFE53935).withOpacity(0.5),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor, insira uma senha';
+                          }
+                          if (value.length < 6) {
+                            return 'Senha deve ter pelo menos 6 caracteres';
+                          }
+                          return null;
+                        },
                       ),
-                      child: _isLoading
-                          ? CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            )
-                          : Text(
-                              'Entrar',
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Cores.primaryRed,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 5,
+                          ),
+                          child: _isLoading
+                              ? CircularProgressIndicator(
+                                  color: Cores.textWhite,
+                                  strokeWidth: 2,
+                                )
+                              : Text(
+                                  'Login',
+                                  style: TextStyle(
+                                    color: Cores.textWhite,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () => _MudarSenha(_emailController.text),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              'Esqueceu a senha?',
                               style: TextStyle(
-                                fontSize: 18.0,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: Cores.primaryRed.withOpacity(0.7),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
                               ),
                             ),
-                    ),
-                    SizedBox(height: 16.0),
-                    TextButton(
-                      onPressed: () {
-                        // Implementar funcionalidade de recuperação de senha
-                      },
-                      child: Text(
-                        'Esqueceu a senha?',
-                        style: TextStyle(
-                          color: Color(0xFFFDD835),
-                          fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 30),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Não tem uma conta? ',
+                            style: TextStyle(color: Cores.textGray),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(context, '/telaCadastro');
+                            },
+                            child: Text(
+                              'Criar conta',
+                              style: TextStyle(
+                                color: Cores.primaryRed.withOpacity(0.7),
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLogoHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Cores.primaryRed,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Cores.primaryRed.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Image.asset('logo/Icone_FlowOrder.png', height: 100),
     );
   }
 
@@ -239,14 +327,14 @@ class _telalogin extends State<Tela_Login> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[850],
+        color: Cores.cardBlack,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+        border: Border.all(color: Cores.borderGray, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withOpacity(0.1),
+            color: Cores.borderGray.withOpacity(0.1),
             blurRadius: 5,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -254,15 +342,16 @@ class _telalogin extends State<Tela_Login> {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        style: TextStyle(color: Colors.white),
+        style: TextStyle(color: Cores.textWhite),
         validator: validator,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: Colors.white70),
-          prefixIcon: Icon(icon, color: Colors.red),
+          labelStyle: TextStyle(color: Cores.textGray),
+          prefixIcon: Icon(icon, color: Cores.primaryRed),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          floatingLabelStyle: TextStyle(color: Cores.primaryRed),
         ),
       ),
     );

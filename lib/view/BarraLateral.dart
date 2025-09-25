@@ -164,7 +164,7 @@ class Barralateral extends StatelessWidget {
       case '/pedidos':
         return TelaPedidos();
       default:
-        return Tela_Login();
+        return TelaLogin();
     }
   }
 
