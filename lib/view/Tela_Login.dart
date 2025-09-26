@@ -171,7 +171,7 @@ class _TelaLoginState extends State<TelaLogin> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'FlowOrder - Comandas',
+                        'Comandas',
                         style: TextStyle(color: Cores.textGray, fontSize: 16),
                       ),
                       const SizedBox(height: 40),
