@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart'; // Importa o núcleo do Firebase
 import 'firebase_options.dart';
-import 'view/Tela_Login.dart'; // Adicionando o import para TelaLogin
-import 'view/TelaHome.dart'; // Adicionando o import para TelaHome
-import 'view/TelaPedidos.dart'; // Adicionando o import para TelaPedidos
+import 'view/Tela_Login.dart';
+import 'view/TelaHome.dart';
+import 'view/TelaPedidos.dart';
+import 'view/TelaMesas.dart';
+import 'view/TelaCardapio.dart';
 
 // O ponto de entrada principal do aplicativo.
 void main() async {
@@ -23,8 +25,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Definindo as cores do tema para replicar a estética fornecida.
-// O arquivo original 'Cores.dart' não foi incluído, então as cores são definidas aqui.
 class Cores {
   static const Color backgroundBlack = Color(0xFF1C1C1C);
   static const Color primaryRed = Color(0xFFE53935);
@@ -54,6 +54,8 @@ class FlowOrderGarcomApp extends StatelessWidget {
         '/': (context) => Tela_Login(),
         '/home': (context) => TelaHome(),
         '/pedidos': (context) => TelaPedidos(),
+        '/mesas': (context) => MesasScreen(),
+        '/cardapio': (context) => TelaCardapio(),
       },
       onGenerateRoute: (settings) {
         switch (settings.name) {
@@ -63,6 +65,10 @@ class FlowOrderGarcomApp extends StatelessWidget {
             return MaterialPageRoute(builder: (context) => TelaHome());
           case '/pedidos':
             return MaterialPageRoute(builder: (context) => TelaPedidos());
+          case '/mesas':
+            return MaterialPageRoute(builder: (context) => MesasScreen());
+          case '/cardapio':
+            return MaterialPageRoute(builder: (context) => TelaCardapio());
           default:
             return null;
         }

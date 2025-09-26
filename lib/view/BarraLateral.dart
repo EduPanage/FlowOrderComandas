@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../auxiliar/Cores.dart';
+import '../firebase/LoginFirebase.dart'; 
 
 class BarraLateral extends StatelessWidget {
   final String currentRoute;
@@ -87,9 +88,25 @@ class BarraLateral extends StatelessWidget {
           'Sair',
           style: TextStyle(color: Cores.textWhite, fontWeight: FontWeight.bold),
         ),
-        onTap: () {
-          // TODO: Implementar a lógica de logout.
-          // Navigator.pushReplacementNamed(context, '/login');
+        onTap: () async {
+          // IMPLEMENTAÇÃO DA LÓGICA DE LOGOUT
+          try {
+            LoginFirebase loginFirebase = LoginFirebase();
+            await loginFirebase.logout(); // Chama o método de logout
+
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/', // Rota da Tela_Login
+              (Route<dynamic> route) => false, // Remove todas as rotas (home, mesas, etc.)
+            );
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Logout realizado com sucesso!')),
+            );
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erro ao fazer logout: $e')),
+            );
+          }
         },
       ),
     );

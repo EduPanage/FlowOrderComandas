@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:floworder/controller/PedidoController.dart';
 import 'package:floworder/models/Pedido.dart';
 import 'package:floworder/models/ItemCardapio.dart';
+import 'package:floworder/models/Mesa.dart'; 
 import '../auxiliar/Cores.dart';
 import 'BarraLateral.dart';
 
 class TelaPedidos extends StatefulWidget {
+  final Mesa? mesa; 
+  
+  const TelaPedidos({this.mesa, super.key}); 
+
   @override
   State<TelaPedidos> createState() => _TelaPedidosState();
 }
@@ -34,7 +39,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Pedidos',
+                    // Exibe o número da mesa se o parâmetro foi passado
+                    widget.mesa != null ? 'Pedidos - Mesa ${widget.mesa!.numero}' : 'Pedidos',
                     style: TextStyle(
                       color: Cores.textWhite,
                       fontSize: 32,

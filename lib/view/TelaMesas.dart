@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../auxiliar/Cores.dart';
 import '../controller/MesaController.dart';
 import '../models/Mesa.dart';
-import 'TelaPedidos.dart';
+import 'TelaPedidos.dart'; // Mantido como TelaPedidos.dart
 
 class MesasScreen extends StatefulWidget {
   @override
@@ -34,7 +34,8 @@ class _MesasScreenState extends State<MesasScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PedidoScreen(mesa: mesa),
+        // CORREÇÃO 1: 'PedidoScreen' alterado para 'TelaPedidos'
+        builder: (context) => TelaPedidos(mesa: mesa),
       ),
     );
   }
@@ -53,7 +54,6 @@ class _MesasScreenState extends State<MesasScreen> {
           IconButton(
             icon: Icon(Icons.add, color: Cores.textWhite),
             onPressed: () {
-              // TODO: Implementar cadastro de nova mesa
             },
           ),
           IconButton(
@@ -108,10 +108,9 @@ class _MesasScreenState extends State<MesasScreen> {
                 }
                 if (snapshot.hasError) {
                   return Center(
-                    // Usa a cor vermelha para erros
                     child: Text(
                       'Erro: ${snapshot.error}',
-                      style: TextStyle(color: Cores.errorRed),
+                      style: TextStyle(color: Cores.primaryRed),
                     ),
                   );
                 }
@@ -162,7 +161,6 @@ class _MesasScreenState extends State<MesasScreen> {
         elevation: 8,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          // Usa a cor vermelha principal com opacidade para a borda
           side: BorderSide(color: Cores.primaryRed.withOpacity(0.5), width: 1.5),
         ),
         child: Padding(

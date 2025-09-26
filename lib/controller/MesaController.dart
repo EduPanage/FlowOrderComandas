@@ -17,12 +17,7 @@ class MesaController {
         return 'Erro: Mesa já cadastrada';
       }
 
-      if (mesa.nome.isEmpty) {
-        mesa.nome = "Mesa ${mesa.numero}";
-      }
-
       String mesaId = await _mesaFirebase.adicionarMesa(userId, mesa);
-      mesa.uid = mesaId;
 
       return 'Mesa cadastrada com sucesso';
     } catch (e) {
@@ -51,7 +46,10 @@ class MesaController {
     if (userId == null) {
       throw Exception('Erro: Nenhum Gerente logado');
     }
-    return _mesaFirebase.listarMesasTempoReal(userId);
+  
+    return _mesaFirebase.listarMesasTempoReal(userId).map((snapshot) {
+      return _mesaFirebase.querySnapshotParaMesas(snapshot);
+    });
   }
 
   /// Deletar mesa
