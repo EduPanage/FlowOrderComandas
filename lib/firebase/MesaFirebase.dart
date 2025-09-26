@@ -120,4 +120,15 @@ class MesaFirebase {
   Future<bool> verificarMesaExistente(int numero, String userId) async {
     return false;
   }
+
+  Future<void> atualizarStatusMesa(
+      String gerenteId,
+      String mesaUid,
+      String novoStatus,
+      ) async {
+    await _firestore.collection('Mesas').doc(mesaUid).update({
+      'status': novoStatus,
+      'atualizadoEm': FieldValue.serverTimestamp(),
+    });
+  }
 }

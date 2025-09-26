@@ -1,178 +1,92 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:floworder/firebase/PedidoFirebase.dart';
-import 'package:floworder/firebase/UsuarioFirebase.dart';
-import '../models/ItemCardapio.dart';
+import '../firebase/PedidoFirebase.dart';
+import '../firebase/MesaFirebase.dart'; // Importação para controlar o status da mesa
 import '../models/Pedido.dart';
 
 class PedidoController {
-  final FirebaseFirestore _firestore;
-  late final CollectionReference _pedidosRef;
-  final UsuarioFirebase _user = UsuarioFirebase();
-  PedidoFirebase _pedidoFirebase = PedidoFirebase();
+  // Inicializa a camada de serviço do Pedido e da Mesa
+  final PedidoFirebase _pedidoFirebase = PedidoFirebase();
+  final MesaFirebase _mesaFirebase = MesaFirebase();
 
-  PedidoController({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance {
-    _pedidosRef = _firestore.collection('Pedidos');
+  // Método auxiliar para obter o UID do Gerente
+  Future<String?> _getGerenteUid() async {
+    return await _mesaFirebase.verificarGerenteUid();
   }
 
-  /// Cadastra um novo pedido no Firestore
-  Future<void> cadastrarPedido(Pedido pedido) async {
+  /// Cadastra um novo pedido no Firestore e atualiza o status da mesa
+  Future<String> cadastrarPedido(Pedido pedido) async {
     try {
-      String? uid = _user.pegarIdUsuarioLogado();
-
-      // Busca o documento do usuário
-      final doc = await FirebaseFirestore.instance
-          .collection('Usuarios')
-          .doc(uid)
-          .get();
-      final gerenteUid = doc.data()?['gerenteUid'] as String?;
-
-      if (gerenteUid == null) {
-        throw Exception('GerenteUid não encontrado para o usuário');
+      // Validações
+      if (pedido.itens.isEmpty) {
+        return 'Erro: O pedido deve ter pelo menos um item.';
+      }
+      if (pedido.mesaUid == null || pedido.mesaUid!.isEmpty) {
+        return 'Erro: O pedido deve estar associado a uma mesa.';
       }
 
+      // 1. Obter o UID do Gerente e aplicar ao pedido
+      String? gerenteUid = await _getGerenteUid();
+      if (gerenteUid == null) {
+        return 'Erro: Usuário não logado ou gerente não encontrado.';
+      }
       pedido.gerenteUid = gerenteUid;
-      DocumentReference docRef = await _pedidosRef.add(pedido.toMap());
-      await docRef.update({'uid': docRef.id});
+
+      // 2. Definir o status inicial e horário
+      pedido.statusAtual = 'Aberto';
+      pedido.horario = Timestamp.now();
+
+      // 3. Enviar o pedido para o Firebase
+      String pedidoId = await _pedidoFirebase.adicionarPedido(pedido);
+      pedido.uid = pedidoId;
+
+      // 4. Atualizar o status da Mesa para 'Ocupada'
+      await _mesaFirebase.atualizarStatusMesa(
+          gerenteUid,
+          pedido.mesaUid!,
+          'Ocupada'
+      );
+
+      return 'Pedido cadastrado com sucesso: $pedidoId';
     } catch (e) {
-      throw Exception('Erro ao cadastrar pedido: $e');
+      print('Erro ao cadastrar pedido: $e');
+      return 'Erro ao cadastrar pedido: ${e.toString()}';
     }
   }
 
-  /// Atualiza o status de um pedido
-  Future<bool> mudarStatusPedido(String pedidoUid, String novoStatus) async {
+  /// Lista pedidos em tempo real (Stream)
+  Stream<List<Pedido>> listarPedidosTempoReal() async* {
+    String? gerenteUid = await _getGerenteUid();
+
+    if (gerenteUid == null) {
+      yield* Stream.value([]);
+      return;
+    }
+
+    // Chama o serviço do Firebase com o UID do gerente
+    yield* _pedidoFirebase.listarPedidosTempoReal(gerenteUid);
+  }
+
+  /// Atualiza o status de um pedido e gerencia o status da mesa
+  Future<bool> mudarStatusPedido(String pedidoId, String novoStatus) async {
     try {
-      await _pedidoFirebase.atualizarStatus(pedidoUid, novoStatus);
+      await _pedidoFirebase.atualizarStatus(pedidoId, novoStatus);
+
+      // Lógica para liberar a mesa quando o pedido é finalizado ou cancelado
+      if (novoStatus == 'Entregue' || novoStatus == 'Cancelado') {
+          final pedido = await _pedidoFirebase.buscarPedidoPorId(pedidoId);
+          if (pedido != null && pedido.mesaUid != null) {
+              String? gerenteUid = await _getGerenteUid();
+              if (gerenteUid != null) {
+                  // Mudar o status da mesa de volta para 'Livre'
+                  await _mesaFirebase.atualizarStatusMesa(gerenteUid, pedido.mesaUid!, 'Livre');
+              }
+          }
+      }
+
       return true;
     } catch (e) {
       print('Erro ao mudar status do pedido: $e');
       return false;
     }
-  }
-
-  /// Exclui um pedido (cancela)
-  Future<bool> cancelarPedido(String pedidoUid) async {
-    try {
-      await _pedidoFirebase.excluirPedido(pedidoUid);
-      return true;
-    } catch (e) {
-      print('Erro ao cancelar pedido: $e');
-      return false;
-    }
-  }
-
-  /// Busca todos os pedidos do gerente logado em tempo real (stream)
-  Stream<List<Pedido>> listarPedidosTempoReal() {
-    try {
-      String? gerenteUid = _user.pegarIdUsuarioLogado();
-      if (gerenteUid == null) {
-        throw Exception('Usuário não logado');
-      }
-      return _pedidoFirebase.buscarPedidosTempoReal(gerenteUid);
-    } catch (e) {
-      print('Erro ao buscar pedidos em tempo real: $e');
-      return Stream.value([]);
-    }
-  }
-
-  /// Gera um relatório diário de vendas e status
-  Future<Map<String, dynamic>> gerarRelatorioDiario() async {
-    final hoje = DateTime.now();
-    final pedidos = await _pedidoFirebase.buscarPedidosDoDia(hoje);
-    double totalVendas = 0.0;
-    int totalPedidos = pedidos.length;
-    Map<String, int> statusCount = {};
-    Map<String, double> pagamentoPorMetodo = {
-      "Dinheiro": 0.0,
-      "Cartão": 0.0,
-      "PIX": 0.0,
-      "Outro": 0.0,
-    };
-
-    // Busca detalhes de pagamento em paralelo para todos os pedidos
-    final futures = pedidos.map((p) async {
-      Map<String, dynamic>? detalhe;
-      if (p.uid != null) {
-        detalhe = await _pedidoFirebase.buscarDetalhePagamento(p.uid!);
-      }
-      return {'pedido': p, 'detalhe': detalhe};
-    }).toList();
-
-    final results = await Future.wait(futures);
-
-    for (final r in results) {
-      final Pedido pedido = r['pedido'] as Pedido;
-      final detalhe = r['detalhe'] as Map<String, dynamic>?;
-
-      // Somar total de vendas pelos pagamentos encontrados (se houver)
-      if (detalhe != null) {
-        final valor = (detalhe['valorPago'] as num).toDouble();
-        final metodo = detalhe['metodoPagamento'] as String? ?? 'Outro';
-
-        totalVendas += valor;
-        pagamentoPorMetodo[metodo] = (pagamentoPorMetodo[metodo] ?? 0.0) + valor;
-      }
-
-      // Corrigido: Usar um valor padrão para a chave do mapa, se 'statusAtual' for nulo.
-      final status = pedido.statusAtual ?? 'Desconhecido';
-      statusCount[status] = (statusCount[status] ?? 0) + 1;
-    }
-
-    return {
-      'totalVendas': totalVendas,
-      'totalPedidos': totalPedidos,
-      'statusCount': statusCount,
-      'pagamentoPorMetodo': pagamentoPorMetodo,
-    };
-  }
-
-  /// Gerar relatório de vendas por período
-  Future<Map<String, dynamic>> gerarRelatorioPorPeriodo(
-      DateTime inicio, DateTime fim) async {
-    final pedidos = await _pedidoFirebase.buscarPedidosPorPeriodo(inicio, fim);
-    double totalVendas = 0.0;
-    int totalPedidos = pedidos.length;
-    Map<String, int> statusCount = {};
-    Map<String, double> pagamentoPorMetodo = {
-      "Dinheiro": 0.0,
-      "Cartão": 0.0,
-      "PIX": 0.0,
-      "Outro": 0.0,
-    };
-
-    // Busca detalhes de pagamento em paralelo para todos os pedidos
-    final futures = pedidos.map((p) async {
-      Map<String, dynamic>? detalhe;
-      if (p.uid != null) {
-        detalhe = await _pedidoFirebase.buscarDetalhePagamento(p.uid!);
-      }
-      return {'pedido': p, 'detalhe': detalhe};
-    }).toList();
-
-    final results = await Future.wait(futures);
-
-    for (final r in results) {
-      final Pedido pedido = r['pedido'] as Pedido;
-      final detalhe = r['detalhe'] as Map<String, dynamic>?;
-
-      // Somar total de vendas pelos pagamentos encontrados (se houver)
-      if (detalhe != null) {
-        final valor = (detalhe['valorPago'] as num).toDouble();
-        final metodo = detalhe['metodoPagamento'] as String? ?? 'Outro';
-
-        totalVendas += valor;
-        pagamentoPorMetodo[metodo] = (pagamentoPorMetodo[metodo] ?? 0.0) + valor;
-      }
-
-      final status = pedido.statusAtual ?? 'Desconhecido';
-      statusCount[status] = (statusCount[status] ?? 0) + 1;
-    }
-
-    return {
-      'totalVendas': totalVendas,
-      'totalPedidos': totalPedidos,
-      'statusCount': statusCount,
-      'pagamentoPorMetodo': pagamentoPorMetodo,
-    };
   }
 }

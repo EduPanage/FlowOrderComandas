@@ -48,15 +48,18 @@ class PedidoFirebase {
   }
 
   /// Busca pedidos em tempo real (stream)
-  Stream<List<Pedido>> buscarPedidosTempoReal(String gerenteUid) {
+  Stream<List<Pedido>> listarPedidosTempoReal(String gerenteUid) {
     return _pedidosRef
         .where('gerenteUid', isEqualTo: gerenteUid)
+        // Ordena por horário decrescente para os pedidos mais recentes aparecerem primeiro
+        .orderBy('horario', descending: true) 
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map(
-              (doc) => Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id),
-            )
-            .toList());
+        .map((snapshot) {
+      // Converte a QuerySnapshot do Firestore para List<Pedido>
+      return snapshot.docs.map((doc) {
+        return Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+    });
   }
 
   Future<void> editarPedido(String uid, Map<String, dynamic> dadosAtualizados) async {
@@ -156,4 +159,18 @@ class PedidoFirebase {
       };
     }
   }
+
+  Future<Pedido?> buscarPedidoPorId(String pedidoId) async {
+    try {
+      // _pedidosRef é a CollectionReference já definida na classe
+      final doc = await _pedidosRef.doc(pedidoId).get();
+      if (!doc.exists) return null;
+      // Reutiliza o factory constructor do Pedido
+      return Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+    } catch (e) {
+      print('Erro ao buscar pedido por ID: $e');
+      return null;
+    }
+  }
+
 }
