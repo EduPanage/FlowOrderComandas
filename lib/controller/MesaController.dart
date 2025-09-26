@@ -8,13 +8,13 @@ class MesaController {
   /// Cadastrar mesa
   Future<String> cadastrarMesa(Mesa mesa) async {
     try {
-      if (await verificarMesaExistente(mesa.numero)) {
-        return 'Erro: Mesa já cadastrada';
-      }
-
       String? userId = _mesaFirebase.pegarIdUsuarioLogado();
       if (userId == null) {
-        throw Exception('Erro: Nenhum Usuario logado');
+        throw Exception('Erro: Nenhum Gerente logado');
+      }
+
+      if (await _mesaFirebase.verificarMesaExistente(mesa.numero, userId)) {
+        return 'Erro: Mesa já cadastrada';
       }
 
       if (mesa.nome.isEmpty) {
@@ -45,21 +45,13 @@ class MesaController {
     }
   }
 
-  /// Stream de mesas do gerente (tempo real)
-  Stream<List<Mesa>> streamMesas() async* {
+  /// Listar mesas em tempo real (stream)
+  Stream<List<Mesa>> listarMesasTempoReal() {
     String? userId = _mesaFirebase.pegarIdUsuarioLogado();
     if (userId == null) {
-      yield [];
-      return;
+      throw Exception('Erro: Nenhum Gerente logado');
     }
-
-    Stream<QuerySnapshot<Object?>> mesasStream = await _mesaFirebase
-        .streamMesas(userId);
-
-    await for (QuerySnapshot snapshot in mesasStream) {
-      List<Mesa> mesas = _mesaFirebase.querySnapshotParaMesas(snapshot);
-      yield mesas;
-    }
+    return _mesaFirebase.listarMesasTempoReal(userId);
   }
 
   /// Deletar mesa
@@ -93,20 +85,6 @@ class MesaController {
       return 'Mesa atualizada com sucesso';
     } catch (e) {
       throw Exception('Erro ao atualizar mesa: ${e.toString()}');
-    }
-  }
-
-  /// Verificar se mesa já existe
-  Future<bool> verificarMesaExistente(int numero) async {
-    String? userId = _mesaFirebase.pegarIdUsuarioLogado();
-    if (userId == null) {
-      throw Exception('Erro: Nenhum Gerente logado');
-    }
-
-    try {
-      return await _mesaFirebase.verificarMesaExistente(userId, numero);
-    } catch (e) {
-      throw Exception('Erro ao verificar mesa existente: ${e.toString()}');
     }
   }
 }

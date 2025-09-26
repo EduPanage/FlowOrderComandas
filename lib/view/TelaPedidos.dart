@@ -1,34 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:floworder/controller/PedidoController.dart';
 import 'package:floworder/models/Pedido.dart';
+import 'package:floworder/models/ItemCardapio.dart';
 import '../auxiliar/Cores.dart';
 import 'BarraLateral.dart';
 
 class TelaPedidos extends StatefulWidget {
-  const TelaPedidos({Key? key}) : super(key: key);
-
   @override
   State<TelaPedidos> createState() => _TelaPedidosState();
 }
 
 class _TelaPedidosState extends State<TelaPedidos> {
   final PedidoController _pedidoController = PedidoController();
-  Future<Stream<List<Pedido>>>? _pedidosFuture;
-
-  String _filtroStatus = 'Todos';
-  final List<String> _opcoesFiltro = [
-    'Todos',
-    'Aberto',
-    'Em Preparo',
-    'Pronto',
-    'Entregue',
-    'Cancelado',
-  ];
+  Stream<List<Pedido>>? _pedidosStream;
 
   @override
   void initState() {
     super.initState();
-    _pedidosFuture = _pedidoController.listarPedidosTempoReal();
+    _pedidosStream = _pedidoController.listarPedidosTempoReal();
   }
 
   @override
@@ -37,7 +26,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
       backgroundColor: Cores.backgroundBlack,
       body: Row(
         children: [
-          const Barralateral(currentRoute: '/pedidos'),
+          BarraLateral(currentRoute: '/pedidos'),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -53,41 +42,6 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Adicionando os ChoiceChips para filtragem
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: _opcoesFiltro.map((status) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ChoiceChip(
-                            label: Text(
-                              status,
-                              style: TextStyle(color: Cores.textWhite),
-                            ),
-                            selected: _filtroStatus == status,
-                            selectedColor: Cores.primaryRed,
-                            backgroundColor: Cores.cardBlack,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(
-                                color: Cores.borderGray.withOpacity(0.5),
-                              ),
-                            ),
-                            onSelected: (selecionado) {
-                              if (selecionado) {
-                                setState(() {
-                                  _filtroStatus = status;
-                                });
-                              }
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
                   Expanded(child: _buildPedidosArea()),
                 ],
               ),
@@ -99,225 +53,145 @@ class _TelaPedidosState extends State<TelaPedidos> {
   }
 
   Widget _buildPedidosArea() {
-    return FutureBuilder<Stream<List<Pedido>>>(
-      future: _pedidosFuture,
-      builder: (context, futureSnap) {
-        if (futureSnap.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(color: Cores.primaryRed),
-          );
-        }
-        if (futureSnap.hasError) {
-          return Center(
-            child: Text(
-              "Erro: ${futureSnap.error}",
-              style: TextStyle(color: Cores.textGray),
-            ),
-          );
-        }
-        if (!futureSnap.hasData) {
-          return _buildEmptyState();
+    return StreamBuilder<List<Pedido>>(
+      stream: _pedidosStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
         }
 
-        return StreamBuilder<List<Pedido>>(
-          stream: futureSnap.data,
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: CircularProgressIndicator(color: Cores.primaryRed),
-              );
-            }
-            if (snap.hasError) {
-              return Center(
-                child: Text(
-                  "Erro: ${snap.error}",
-                  style: TextStyle(color: Cores.textGray),
-                ),
-              );
-            }
+        if (snapshot.hasError) {
+          return Center(child: Text('Erro: ${snapshot.error}', style: TextStyle(color: Cores.textWhite)));
+        }
 
-            final todosPedidos = snap.data ?? [];
-            final pedidosFiltrados = todosPedidos.where((pedido) {
-              if (_filtroStatus == 'Todos') {
-                return true;
-              }
-              return pedido.statusAtual == _filtroStatus;
-            }).toList();
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(child: Text('Nenhum pedido encontrado.', style: TextStyle(color: Cores.textGray)));
+        }
 
-            if (pedidosFiltrados.isEmpty) return _buildEmptyState();
+        final pedidos = snapshot.data!;
 
-            return ListView.builder(
-              itemCount: pedidosFiltrados.length,
-              itemBuilder: (context, i) =>
-                  _buildPedidoCard(pedidosFiltrados[i]),
-            );
+        return ListView.builder(
+          itemCount: pedidos.length,
+          itemBuilder: (context, index) {
+            return _buildPedidoCard(pedidos[index]);
           },
         );
       },
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long, size: 80, color: Cores.textGray),
-          const SizedBox(height: 16),
-          Text(
-            'Nenhum pedido encontrado',
-            style: TextStyle(color: Cores.textGray, fontSize: 18),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPedidoCard(Pedido pedido) {
-    final total = pedido.calcularTotal();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Cores.cardBlack,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Cores.borderGray),
+    return Card(
+      color: Cores.cardBlack,
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Cores.borderGray, width: 1),
       ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.all(16),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        title: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Cores.primaryRed,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                'Mesa ${pedido.mesa.numero}',
-                style: TextStyle(
-                  color: Cores.textWhite,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Total: R\$ ${total.toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: Cores.textWhite,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            _buildStatusChip(pedido.statusAtual),
-          ],
-        ),
-        subtitle: Text(
-          'Itens: ${pedido.itens.length} - Horário: ${_formatarHorario(pedido.horario)}',
-          style: TextStyle(color: Cores.textGray, fontSize: 12),
-        ),
-        children: [
-          ...pedido.itens.map(
-            (item) => ListTile(
-              dense: true,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "${item.quantidade}x ${item.nome}",
-                    style: TextStyle(color: Cores.textWhite),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Mesa ${pedido.nomeMesa ?? 'N/A'}',
+                  style: TextStyle(
+                    color: Cores.textWhite,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  if (item.observacao != null && item.observacao!.isNotEmpty)
-                    Text(
-                      "OBS: " + item.observacao!,
-                      style: TextStyle(color: Cores.primaryRed, fontSize: 12),
-                    ),
-                ],
+                ),
+                _buildStatusChip(pedido.statusAtual),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Horário: ${_formatarHorario(pedido.horario?.toDate() ?? DateTime.now())}',
+              style: TextStyle(
+                color: Cores.textGray,
+                fontSize: 14,
               ),
-              subtitle: Text(
-                item.categoria,
+            ),
+            const SizedBox(height: 16),
+            if (pedido.itens?.isNotEmpty == true)
+              ...pedido.itens!.map((item) => _buildItemCardapio(item)).toList(),
+            
+            if (pedido.observacoes?.isNotEmpty == true) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Observações:',
+                style: TextStyle(
+                  color: Cores.textWhite,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                pedido.observacoes!,
                 style: TextStyle(color: Cores.textGray),
               ),
-              trailing: Text(
-                "R\$ ${(item.preco * item.quantidade).toStringAsFixed(2)}",
-                style: TextStyle(color: Cores.primaryRed),
-              ),
+            ],
+            
+            const SizedBox(height: 16),
+            _buildStatusActions(pedido),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemCardapio(ItemCardapio item) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              '${item.nome}',
+              style: TextStyle(color: Cores.textWhite),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (pedido.observacao != null && pedido.observacao!.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Cores.primaryRed.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Cores.primaryRed.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Observação do Pedido:',
-                    style: TextStyle(
-                      color: Cores.primaryRed,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    pedido.observacao!,
-                    style: TextStyle(color: Cores.textWhite, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 8),
-          _buildStatusActions(pedido),
+          Text(
+            'R\$ ${item.preco?.toStringAsFixed(2)}',
+            style: TextStyle(color: Cores.textWhite),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    Color color;
+  Widget _buildStatusChip(String? status) {
+    Color color = Cores.textGray;
     switch (status) {
+      case 'Aberto':
+        color = Colors.blue;
+        break;
       case 'Em Preparo':
         color = Colors.orange;
         break;
       case 'Pronto':
         color = Colors.green;
         break;
-      case 'Aberto':
-        color = Colors.blue;
-        break;
       case 'Entregue':
-        color = Cores.primaryRed;
+        color = Colors.green.shade800;
         break;
-      default:
-        color = Cores.textGray;
+      case 'Cancelado':
+        color = Colors.red;
+        break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color),
       ),
-      child: Text(
-        status,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: Text(status ?? 'Desconhecido', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -334,10 +208,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
           selectedColor: Cores.primaryRed,
           onSelected: (value) async {
             if (!selected) {
-              final sucesso = await _pedidoController.mudarStatusPedido(
-                pedido.uid!,
-                status,
-              );
+              final sucesso = await _pedidoController.mudarStatusPedido(pedido.uid!, status);
               if (sucesso) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -345,7 +216,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     backgroundColor: Colors.green,
                   ),
                 );
-                setState(() {}); // força atualização
+                setState(() {});
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

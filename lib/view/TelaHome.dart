@@ -3,18 +3,20 @@ import 'package:flutter/material.dart';
 import 'BarraLateral.dart';
 
 class TelaHome extends StatefulWidget {
+  const TelaHome({super.key});
+
   @override
-  State<TelaHome> createState() => _TelaHome();
+  State<TelaHome> createState() => _TelaHomeState();
 }
 
-class _TelaHome extends State<TelaHome> {
+class _TelaHomeState extends State<TelaHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Cores.backgroundBlack,
       body: Row(
         children: [
-          Barralateral(currentRoute: '/home'),
+          BarraLateral(currentRoute: '/home'),
           Expanded(
             child: Stack(
               children: [
@@ -32,8 +34,7 @@ class _TelaHome extends State<TelaHome> {
                   ),
                 ),
 
-                // Conteúdo (vazio por enquanto)
-                SingleChildScrollView(
+                const SingleChildScrollView(
                   padding: EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

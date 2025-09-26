@@ -1,36 +1,36 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Mesa {
-  String? uid;
-  int numero;
-  String nome;
+  final String? uid;
+  final String nome;
+  final int numero;
+  final String? gerenteUid;
+  final Timestamp? criadoEm;
 
-  Mesa({this.uid, required this.numero, this.nome = ''});
+  Mesa({
+    this.uid,
+    required this.nome,
+    required this.numero,
+    this.gerenteUid,
+    this.criadoEm,
+  });
 
-  // Converte a mesa para Map para salvar no Firebase
-  Map<String, dynamic> toMap() {
-    return {'uid': uid, 'numero': numero, 'nome': nome};
-  }
-
-  // Cria uma Mesa a partir de um Map do Firebase
-  factory Mesa.fromMap(Map<String, dynamic> map, String documentId) {
+  factory Mesa.fromMap(Map<String, dynamic> map, String uid) {
     return Mesa(
-      uid: documentId,
+      uid: uid,
+      nome: map['nome'] ?? 'Mesa ${map['numero']}',
       numero: map['numero'] ?? 0,
-      nome: map['nome'] ?? '',
+      gerenteUid: map['gerenteUid'],
+      criadoEm: map['criadoEm'],
     );
   }
 
-  // Copia a mesa com novos valores
-  Mesa copyWith({
-    String? uid,
-    int? numero,
-    String? nome,
-    int? capacidade,
-    bool? ativa,
-  }) {
-    return Mesa(
-      uid: uid ?? this.uid,
-      numero: numero ?? this.numero,
-      nome: nome ?? this.nome,
-    );
+  Map<String, dynamic> toMap() {
+    return {
+      'nome': nome,
+      'numero': numero,
+      'gerenteUid': gerenteUid,
+      'criadoEm': criadoEm,
+    };
   }
 }

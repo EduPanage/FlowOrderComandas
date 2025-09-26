@@ -1,20 +1,14 @@
-// lib/view/TelaLogin.dart
-
 import 'package:flutter/material.dart';
-import 'package:floworder/auxiliar/Cores.dart';
 import '../firebase/LoginFirebase.dart';
 
-class TelaLogin extends StatefulWidget {
-  const TelaLogin({Key? key}) : super(key: key);
-
+class Tela_Login extends StatefulWidget {
   @override
-  State<TelaLogin> createState() => _TelaLoginState();
+  _telalogin createState() => _telalogin();
 }
 
-class _TelaLoginState extends State<TelaLogin> {
+class _telalogin extends State<Tela_Login> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -37,55 +31,53 @@ class _TelaLoginState extends State<TelaLogin> {
   Future<void> _checkAuthStatus() async {
     try {
       LoginFirebase loginFirebase = LoginFirebase();
+
       if (loginFirebase.isLoggedIn()) {
+        Navigator.pushReplacementNamed(context, '/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Usuário já está logado'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao verificar status de autenticação: $e'),
-          backgroundColor: Cores.errorRed,
-        ),
+      SnackBar(
+        content: Text('Erro ao verificar status de autenticação: $e'),
+        backgroundColor: Colors.green,
       );
     }
+
     setState(() {
       _isCheckingAuth = false;
     });
   }
 
   Future<void> _MudarSenha(String email) async {
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Por favor, insira seu e-mail'),
-          backgroundColor: Cores.errorRed,
-        ),
-      );
-      return;
-    }
-
     try {
+      if (email.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Por favor, insira seu e-mail')));
+        return;
+      }
+
       LoginFirebase loginFirebase = LoginFirebase();
       String resultado = await loginFirebase.resetPassword(email);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resultado)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(resultado)));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao enviar e-mail de redefinição: $e'),
-          backgroundColor: Cores.errorRed,
-        ),
+        SnackBar(content: Text('Erro ao enviar e-mail de redefinição: $e')),
       );
     }
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
     setState(() {
       _isLoading = true;
     });
@@ -99,25 +91,23 @@ class _TelaLoginState extends State<TelaLogin> {
 
       if (resultadoLogin == 'success') {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Login realizado com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
+
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(resultadoLogin),
-            backgroundColor: Cores.errorRed,
-          ),
+          SnackBar(content: Text(resultadoLogin), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erro inesperado: $e'),
-          backgroundColor: Cores.errorRed,
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -129,52 +119,119 @@ class _TelaLoginState extends State<TelaLogin> {
 
   @override
   Widget build(BuildContext context) {
+    // Mostra loading inicial apenas por 1 segundo
     if (_isCheckingAuth) {
       return Scaffold(
-        backgroundColor: Cores.backgroundBlack,
-        body: Center(
-          child: CircularProgressIndicator(color: Cores.primaryRed),
+        backgroundColor: Colors.black,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black, Colors.grey[900]!, Colors.black],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.red[900],
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Image.asset('logo/Icone_FlowOrder.png', height: 100),
+                ),
+                SizedBox(height: 30),
+                CircularProgressIndicator(
+                  color: Colors.red[900],
+                  strokeWidth: 3,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Carregando...',
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: Cores.backgroundBlack,
+      backgroundColor: Colors.black,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Cores.backgroundBlack, Cores.darkGray, Cores.backgroundBlack],
+            colors: [Colors.black, Colors.grey[900]!, Colors.black],
           ),
         ),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
+              padding: EdgeInsets.all(32),
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 400),
+                constraints: BoxConstraints(maxWidth: 400),
                 child: Form(
-                  key: _formKey,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildLogoHeader(),
-                      const SizedBox(height: 40),
+                      // Logo/Header
+                      Container(
+                        padding: EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.red[900],
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Image.asset(
+                              'logo/Icone_FlowOrder.png',
+                              height: 100,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 40),
+
                       Text(
                         'Login',
                         style: TextStyle(
-                          color: Cores.textWhite,
+                          color: Colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
+
+                      SizedBox(height: 8),
+
                       Text(
-                        'Comandas',
-                        style: TextStyle(color: Cores.textGray, fontSize: 16),
+                        'Login no FlowOrder',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
                       ),
-                      const SizedBox(height: 40),
+
+                      SizedBox(height: 40),
+
+                      // Campo E-mail
                       _buildInputField(
                         controller: _emailController,
                         label: 'E-mail',
@@ -184,13 +241,18 @@ class _TelaLoginState extends State<TelaLogin> {
                           if (value == null || value.isEmpty) {
                             return 'Por favor, insira seu e-mail';
                           }
-                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                          if (!RegExp(
+                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                          ).hasMatch(value)) {
                             return 'E-mail inválido';
                           }
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
+
+                      SizedBox(height: 20),
+
+                      // Campo Senha
                       _buildInputField(
                         controller: _passwordController,
                         label: 'Senha',
@@ -198,8 +260,10 @@ class _TelaLoginState extends State<TelaLogin> {
                         obscureText: _obscurePassword,
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                            color: Cores.textGray,
+                            _obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: Colors.white70,
                           ),
                           onPressed: () {
                             setState(() {
@@ -217,14 +281,17 @@ class _TelaLoginState extends State<TelaLogin> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
-                      SizedBox(
+
+                      SizedBox(height: 20),
+
+                      // Botão Login
+                      Container(
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _login,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Cores.primaryRed,
+                            backgroundColor: Colors.red[900],
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -232,13 +299,13 @@ class _TelaLoginState extends State<TelaLogin> {
                           ),
                           child: _isLoading
                               ? CircularProgressIndicator(
-                                  color: Cores.textWhite,
+                                  color: Colors.white,
                                   strokeWidth: 2,
                                 )
                               : Text(
                                   'Login',
                                   style: TextStyle(
-                                    color: Cores.textWhite,
+                                    color: Colors.white,
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1,
@@ -250,27 +317,25 @@ class _TelaLoginState extends State<TelaLogin> {
                         alignment: Alignment.centerRight,
                         child: GestureDetector(
                           onTap: () => _MudarSenha(_emailController.text),
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              'Esqueceu a senha?',
-                              style: TextStyle(
-                                color: Cores.primaryRed.withOpacity(0.7),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                decoration: TextDecoration.underline,
-                              ),
+                          child: Text(
+                            'Esqueceu a senha?',
+                            style: TextStyle(
+                              color: Colors.red[400],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 30),
+
+                      SizedBox(height: 30),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             'Não tem uma conta? ',
-                            style: TextStyle(color: Cores.textGray),
+                            style: TextStyle(color: Colors.white70),
                           ),
                           GestureDetector(
                             onTap: () {
@@ -279,7 +344,7 @@ class _TelaLoginState extends State<TelaLogin> {
                             child: Text(
                               'Criar conta',
                               style: TextStyle(
-                                color: Cores.primaryRed.withOpacity(0.7),
+                                color: Colors.red[400],
                                 fontWeight: FontWeight.bold,
                                 decoration: TextDecoration.underline,
                               ),
@@ -298,24 +363,6 @@ class _TelaLoginState extends State<TelaLogin> {
     );
   }
 
-  Widget _buildLogoHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Cores.primaryRed,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Cores.primaryRed.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Image.asset('logo/Icone_FlowOrder.png', height: 100),
-    );
-  }
-
   Widget _buildInputField({
     required TextEditingController controller,
     required String label,
@@ -327,14 +374,14 @@ class _TelaLoginState extends State<TelaLogin> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Cores.cardBlack,
+        color: Colors.grey[850],
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Cores.borderGray, width: 1),
+        border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Cores.borderGray.withOpacity(0.1),
+            color: Colors.red.withOpacity(0.1),
             blurRadius: 5,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -342,16 +389,16 @@ class _TelaLoginState extends State<TelaLogin> {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        style: TextStyle(color: Cores.textWhite),
+        style: TextStyle(color: Colors.white),
         validator: validator,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: Cores.textGray),
-          prefixIcon: Icon(icon, color: Cores.primaryRed),
+          labelStyle: TextStyle(color: Colors.white70),
+          prefixIcon: Icon(icon, color: Colors.red),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          floatingLabelStyle: TextStyle(color: Cores.primaryRed),
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          floatingLabelStyle: TextStyle(color: Colors.red),
         ),
       ),
     );

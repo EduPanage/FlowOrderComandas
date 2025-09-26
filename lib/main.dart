@@ -1,40 +1,72 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:floworder/firebase_options.dart';
-import 'package:floworder/auxiliar/Cores.dart';
-import 'package:floworder/view/Tela_Login.dart';
-import 'package:floworder/view/TelaMesas.dart';
-import 'package:floworder/view/TelaPedidos.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart'; // Importa o núcleo do Firebase
+import 'firebase_options.dart';
+import 'view/Tela_Login.dart'; // Adicionando o import para TelaLogin
+import 'view/TelaHome.dart'; // Adicionando o import para TelaHome
+import 'view/TelaPedidos.dart'; // Adicionando o import para TelaPedidos
 
+// O ponto de entrada principal do aplicativo.
 void main() async {
+  // Garante que o Flutter e o Firebase estão prontos antes de iniciar
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const FlowOrderGarcomApp();
+  }
+}
+
+// Definindo as cores do tema para replicar a estética fornecida.
+// O arquivo original 'Cores.dart' não foi incluído, então as cores são definidas aqui.
+class Cores {
+  static const Color backgroundBlack = Color(0xFF1C1C1C);
+  static const Color primaryRed = Color(0xFFE53935);
+  static const Color textWhite = Color(0xFFFFFFFF);
+  static const Color textGray = Color(0xFF9E9E9E);
+}
+
+class FlowOrderGarcomApp extends StatelessWidget {
+  const FlowOrderGarcomApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'FlowOrder',
       theme: ThemeData(
         scaffoldBackgroundColor: Cores.backgroundBlack,
-        fontFamily: 'Roboto',
+        colorScheme: const ColorScheme.dark(
+          primary: Cores.primaryRed,
+          background: Cores.backgroundBlack,
+          onBackground: Cores.textWhite,
+        ),
+        useMaterial3: true,
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const TelaLogin(),
-        '/mesas': (context) => const TelaMesas(),
-        '/pedidos': (context) => const TelaPedidos(),
-        // Adicione outras rotas conforme necessário, como a tela de cadastro
+        '/': (context) => Tela_Login(),
+        '/home': (context) => TelaHome(),
+        '/pedidos': (context) => TelaPedidos(),
       },
-      debugShowCheckedModeBanner: false,
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (context) => Tela_Login());
+          case '/home':
+            return MaterialPageRoute(builder: (context) => TelaHome());
+          case '/pedidos':
+            return MaterialPageRoute(builder: (context) => TelaPedidos());
+          default:
+            return null;
+        }
+      },
     );
   }
 }

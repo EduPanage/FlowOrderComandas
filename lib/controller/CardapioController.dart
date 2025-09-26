@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../firebase/CardapioFirebase.dart';
 import '../models/Cardapio.dart';
+import '../models/ItemCardapio.dart';
 
 class CardapioController {
   final CardapioFirebase _cardapioFirebase = CardapioFirebase();
@@ -38,29 +39,25 @@ class CardapioController {
 
     try {
       QuerySnapshot snapshot = await _cardapioFirebase.buscarCardapios(userId);
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return Cardapio.fromMap(doc.id, data);
-      }).toList();
+      return _cardapioFirebase.querySnapshotParaCardapios(snapshot);
     } catch (e) {
       throw Exception('Erro ao buscar cardápios: ${e.toString()}');
     }
   }
 
-  /// Stream de cardápios do gerente (tempo real)
-  Future<Stream<List<Cardapio>>> buscarCardapioTempoReal() async {
+  /// Buscar apenas cardápios ativos
+  Future<List<Cardapio>> buscarCardapiosAtivos() async {
     String? userId = await _cardapioFirebase.verificarGerenteUid();
     if (userId == null) {
-      return Stream.value([]);
+      throw Exception('Erro: Nenhum Gerente logado');
     }
 
-    return _cardapioFirebase.streamCardapios(userId).map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return Cardapio.fromMap(doc.id, data);
-      }).toList();
-    });
+    try {
+      QuerySnapshot snapshot = await _cardapioFirebase.buscarCardapiosAtivos(userId);
+      return _cardapioFirebase.querySnapshotParaCardapios(snapshot);
+    } catch (e) {
+      throw Exception('Erro ao buscar cardápios ativos: ${e.toString()}');
+    }
   }
 
   /// Atualizar cardápio
@@ -105,12 +102,14 @@ class CardapioController {
     }
 
     try {
-      await _cardapioFirebase.suspenderCardapio(userId, cardapioUid, suspender);
-      return suspender
-          ? 'Cardápio suspenso com sucesso'
-          : 'Cardápio reativado com sucesso';
+      await _cardapioFirebase.suspenderCardapio(
+        userId,
+        cardapioUid,
+        suspender,
+      );
+      return suspender ? 'Cardápio suspenso com sucesso' : 'Cardápio reativado com sucesso';
     } catch (e) {
-      throw Exception('Erro ao alterar status do cardápio: ${e.toString()}');
+      throw Exception('Erro ao suspender/reativar cardápio: ${e.toString()}');
     }
   }
 }

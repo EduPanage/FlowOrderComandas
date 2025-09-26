@@ -1,205 +1,110 @@
-import 'dart:ui' as html;
-
-import 'package:floworder/firebase/LoginFirebase.dart';
-import 'package:floworder/view/Tela_Login.dart';
 import 'package:flutter/material.dart';
-import 'package:floworder/view/TelaPedidos.dart';
-import 'package:floworder/view/TelaMesas.dart';
+import 'package:floworder/auxiliar/Cores.dart';
 
-import '../auxiliar/Cores.dart';
-
-
-class Barralateral extends StatelessWidget {
+class BarraLateral extends StatelessWidget {
   final String currentRoute;
 
-  const Barralateral({Key? key, required this.currentRoute}) : super(key: key);
-
-  Future<void> logout() async {
-    LoginFirebase loginFirebase = LoginFirebase();
-    loginFirebase.logout();
-  }
+  const BarraLateral({Key? key, required this.currentRoute}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 250,
-      height: double.infinity,
       color: Cores.cardBlack,
       child: Column(
         children: [
-          // Header
-          Container(
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Cores.darkRed,
-              boxShadow: [
-                BoxShadow(
-                  color: Cores.primaryRed.withOpacity(0.3),
-                  blurRadius: 5,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    navigateWithFade(context, '/home');
-                  },
-                  child: Image.asset(
-                    'logo/Icone_FlowOrder.png',
-                    height: 100,
-                    width: double.infinity,
-                  ),
-                ),
-              ],
-            ),
+          _buildLogo(),
+          const SizedBox(height: 32),
+          _buildMenuItem(
+            context,
+            icon: Icons.home,
+            label: 'Home',
+            route: '/home',
           ),
-          const SizedBox(height: 40),
-          // Menu Items
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(0),
-              children: [
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.dashboard,
-                  title: 'Dashboard',
-                  route: '/dashboard',
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.point_of_sale,
-                  title: 'Caixa',
-                  route: '/caixa',
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.fact_check_outlined,
-                  title: 'Pedidos',
-                  route: '/pedidos',
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.menu_book,
-                  title: 'Cardápio',
-                  route: '/cardapio',
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.table_bar,
-                  title: 'Mesas',
-                  route: '/mesas',
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.person,
-                  title: 'Funcionários',
-                  route: '/funcionarios',
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.analytics,
-                  title: 'Relatórios',
-                  route: '/relatorios',
-                ),
-              ],
-            ),
+          _buildMenuItem(
+            context,
+            icon: Icons.menu_book,
+            label: 'Cardápio',
+            route: '/cardapio',
           ),
-          Container(
-            //botão de sair
-            margin: const EdgeInsets.all(8),
-            child: ListTile(
-              leading: Icon(Icons.logout, color: Cores.textGray, size: 20),
-              title: Text(
-                'Deslogar/Logout',
-                style: TextStyle(
-                  color: Cores.textGray,
-                  fontSize: 16,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-              onTap: () async {
-                Navigator.pushReplacementNamed(context, '/telalogin');
-                await logout();
-              },
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
+          _buildMenuItem(
+            context,
+            icon: Icons.table_bar,
+            label: 'Mesas',
+            route: '/mesas',
           ),
-          const SizedBox(height: 20),
+          _buildMenuItem(
+            context,
+            icon: Icons.assignment,
+            label: 'Pedidos',
+            route: '/pedidos',
+          ),
+          const Spacer(),
+          _buildMenuItem(
+            context,
+            icon: Icons.logout,
+            label: 'Sair',
+            route: '/',
+            onTap: () {
+              Navigator.of(context).pushReplacementNamed('/');
+            },
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  /// Função que faz a navegação com transição fade
-  void navigateWithFade(BuildContext context, String routeName) {
-    if (ModalRoute.of(context)?.settings.name == routeName) {
-      return;
-    }
-
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        settings: RouteSettings(name: routeName),
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            getPageForRoute(routeName),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: Duration(milliseconds: 300),
+  Widget _buildLogo() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: const BoxDecoration(
+        color: Cores.backgroundBlack,
+        borderRadius: BorderRadius.only(
+          bottomRight: Radius.circular(16),
+        ),
+      ),
+      child: Center(
+        child: Image.asset(
+          'logo/Icone_FlowOrder.png',
+          height: 80,
+        ),
       ),
     );
   }
 
-  // Mapeamento das rotas para as telas
-  Widget getPageForRoute(String route) {
-    switch (route) {
-      case '/pedidos':
-        return TelaPedidos();
-      default:
-        return TelaLogin();
-    }
-  }
-
-  // Criação dos itens do menu
-  Widget _buildMenuItem({
-    required BuildContext context,
+  Widget _buildMenuItem(
+    BuildContext context, {
     required IconData icon,
-    required String title,
+    required String label,
     required String route,
+    VoidCallback? onTap,
   }) {
-    final bool isActive = currentRoute == route;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: isActive ? Cores.primaryRed : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isActive ? Cores.textWhite : Cores.textGray,
-          size: 20,
+    final bool isSelected = currentRoute == route;
+    return InkWell(
+      onTap: onTap ?? () => Navigator.pushReplacementNamed(context, route),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Cores.primaryRed.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected ? Border.all(color: Cores.primaryRed, width: 2) : null,
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isActive ? Cores.textWhite : Cores.textGray,
-            fontSize: 16,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-          ),
+        child: Row(
+          children: [
+            Icon(icon, color: Cores.textWhite),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: Cores.textWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
-        onTap: () => navigateWithFade(context, route),
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       ),
     );
   }

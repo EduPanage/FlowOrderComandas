@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/Cardapio.dart';
+import '../models/ItemCardapio.dart';
 
 class CardapioFirebase {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -12,7 +13,6 @@ class CardapioFirebase {
   }
 
   Future<String?> verificarGerenteUid() async {
-    // Usa a função que você já tem
     String? userId = pegarIdUsuarioLogado();
     if (userId == null) return null;
 
@@ -22,7 +22,7 @@ class CardapioFirebase {
           .doc(userId)
           .get();
       final userData = doc.data() as Map<String, dynamic>?;
-      final gerenteUid = userData?['gerenteUid'] as String?;
+      final gerenteUid = userData?['gerenteUid'] as String? ?? userId;
       return gerenteUid;
     } catch (e) {
       print('Erro ao verificar gerenteUid: $e');
@@ -42,103 +42,65 @@ class CardapioFirebase {
       final userData = doc.data() as Map<String, dynamic>?;
       final cargo = userData?['cargo'] as String?;
 
-      if (cargo != 'Gerente') throw Exception('Nenhum Gerente Logado');
+      if (cargo == "Gerente") {
+        DocumentReference docRef = await _firestore.collection('Cardapios').add({
+          'nome': cardapio.nome,
+          'categoria': cardapio.categoria,
+          'ativo': cardapio.ativo,
+          'criadoEm': FieldValue.serverTimestamp(),
+          'itens': cardapio.itens.map((i) => i.toMap()).toList(),
+          'gerenteUid': Id,
+        });
 
-      // Normaliza/valida campos mínimos
-      final nome = (cardapio.nome ?? '').trim().isEmpty
-          ? 'Item sem nome'
-          : cardapio.nome!;
-      final descricao = (cardapio.descricao ?? '').trim().isEmpty
-          ? 'Descrição não informada'
-          : cardapio.descricao!;
-      final preco = cardapio.preco ?? 0.0;
-      final categoria = (cardapio.categoria ?? 'Outros').trim();
+        await docRef.update({'uid': docRef.id});
+        return docRef.id;
+      } else {
+        final gerenteUid = userData?['gerenteUid'] as String?;
+        DocumentReference docRef = await _firestore.collection('Cardapios').add({
+          'nome': cardapio.nome,
+          'categoria': cardapio.categoria,
+          'ativo': cardapio.ativo,
+          'criadoEm': FieldValue.serverTimestamp(),
+          'itens': cardapio.itens.map((i) => i.toMap()).toList(),
+          'gerenteUid': gerenteUid,
+        });
 
-      DocumentReference docRef = await _firestore.collection('Cardapios').add({
-        'nome': nome,
-        'descricao': descricao,
-        'preco': preco,
-        'categoria': categoria,
-        'ativo': true,
-        'gerenteUid': Id,
-        'criadoEm': FieldValue.serverTimestamp(),
-      });
-
-      // atualiza campo uid no documento (opcional)
-      await docRef.update({'uid': docRef.id});
-      return docRef.id;
+        await docRef.update({'uid': docRef.id});
+        return docRef.id;
+      }
     } catch (e) {
-      throw Exception('Erro ao adicionar cardápio: ${e.toString()}');
+      throw Exception('Erro ao adicionar cardapio: $e');
     }
   }
 
-  /// Busca uma vez os cardápios (sem orderBy para evitar necessidade de índice)
+  /// Busca todos os cardápios de uma vez (snapshot único)
   Future<QuerySnapshot> buscarCardapios(String gerenteId) async {
-    try {
-      if (gerenteId.isEmpty) throw Exception('GerenteId inválido');
-      return await _firestore
-          .collection('Cardapios')
-          .where('gerenteUid', isEqualTo: gerenteId)
-          .get();
-    } catch (e) {
-      throw Exception('Erro ao buscar cardápios: ${e.toString()}');
-    }
+    return _firestore
+        .collection('Cardapios')
+        .where('gerenteUid', isEqualTo: gerenteId)
+        .get();
   }
 
-  /// Stream em tempo real (snapshots) — sem orderBy para evitar índice composto
-  Stream<QuerySnapshot> streamCardapios(String gerenteId) {
-    try {
-      if (gerenteId.isEmpty) return const Stream.empty();
-      return _firestore
-          .collection('Cardapios')
-          .where('gerenteUid', isEqualTo: gerenteId)
-          .snapshots();
-    } catch (e) {
-      return const Stream.empty();
-    }
+  /// Busca apenas cardápios ativos
+  Future<QuerySnapshot> buscarCardapiosAtivos(String gerenteId) async {
+    return _firestore
+        .collection('Cardapios')
+        .where('gerenteUid', isEqualTo: gerenteId)
+        .where('ativo', isEqualTo: true)
+        .get();
   }
 
-  /// Converte QuerySnapshot -> List<Cardapio> e ordena localmente por categoria -> nome
-  List<Cardapio> querySnapshotParaCardapios(QuerySnapshot snapshot) {
-    final lista = snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>? ?? {};
-      return Cardapio.fromMap(doc.id, data);
-    }).toList();
-
-    lista.sort((a, b) {
-      final catA = (a.categoria ?? '').toLowerCase();
-      final catB = (b.categoria ?? '').toLowerCase();
-      final cmpCat = catA.compareTo(catB);
-      if (cmpCat != 0) return cmpCat;
-      final nomeA = (a.nome ?? '').toLowerCase();
-      final nomeB = (b.nome ?? '').toLowerCase();
-      return nomeA.compareTo(nomeB);
-    });
-
-    return lista;
-  }
-
-  /// Converte um DocumentSnapshot para Cardapio (opcionalmente usado pelo controller)
-  Cardapio documentParaCardapio(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return Cardapio.fromMap(doc.id, data);
-  }
-
-  /// Atualiza um cardápio (valida uid)
+  /// Atualiza o cardápio (valida uid)
   Future<void> atualizarCardapio(String gerenteId, Cardapio cardapio) async {
     try {
       if (gerenteId.isEmpty) throw Exception('GerenteId inválido');
-      if (cardapio.uid == null || cardapio.uid!.trim().isEmpty) {
-        throw Exception('UID do cardápio é necessário para atualizar');
-      }
 
       await _firestore.collection('Cardapios').doc(cardapio.uid).update({
         'nome': cardapio.nome,
-        'descricao': cardapio.descricao,
-        'preco': cardapio.preco,
         'categoria': cardapio.categoria,
         'ativo': cardapio.ativo,
         'atualizadoEm': FieldValue.serverTimestamp(),
+        'itens': cardapio.itens.map((i) => i.toMap()).toList(),
       });
     } catch (e) {
       throw Exception('Erro ao atualizar cardápio: ${e.toString()}');
@@ -174,13 +136,26 @@ class CardapioFirebase {
   ) async {
     try {
       if (gerenteId.isEmpty) throw Exception('GerenteId inválido');
-
-      await _firestore.collection('Cardapios').doc(cardapioId).update({
-        'ativo': ativo,
-        'atualizadoEm': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection('Cardapios')
+          .doc(cardapioId)
+          .update({'ativo': ativo});
     } catch (e) {
-      throw Exception('Erro ao alterar status do cardápio: ${e.toString()}');
+      throw Exception('Erro ao suspender/reativar cardápio: ${e.toString()}');
     }
+  }
+
+  /// Converter DocumentSnapshot para Cardapio
+  Cardapio documentParaCardapio(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return Cardapio.fromMap(data, doc.id);
+  }
+
+  /// Converter QuerySnapshot para lista de cardápios
+  List<Cardapio> querySnapshotParaCardapios(QuerySnapshot snapshot) {
+    return snapshot.docs
+        .map((doc) => documentParaCardapio(doc))
+        .where((cardapio) => cardapio.ativo) // Filtra apenas os ativos
+        .toList();
   }
 }

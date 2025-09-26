@@ -20,58 +20,49 @@ class MesaFirebase {
     final userData = doc.data() as Map<String, dynamic>?;
     final cargo = userData?['cargo'] as String?;
 
+    DocumentReference docRef;
+
     if (cargo == "Gerente") {
-      DocumentReference docRef = await _firestore.collection('Mesas').add({
+      docRef = await _firestore.collection('Mesas').add({
         'nome': mesa.nome,
         'numero': mesa.numero,
         'gerenteUid': Id,
         'criadoEm': FieldValue.serverTimestamp(),
       });
-
-      await docRef.update({'uid': docRef.id});
-      return docRef.id;
     } else {
       final gerenteUid = userData?['gerenteUid'] as String?;
-      DocumentReference docRef = await _firestore.collection('Mesas').add({
+      if (gerenteUid == null) {
+        throw Exception('GerenteUid não encontrado para o usuário');
+      }
+      docRef = await _firestore.collection('Mesas').add({
         'nome': mesa.nome,
         'numero': mesa.numero,
         'gerenteUid': gerenteUid,
         'criadoEm': FieldValue.serverTimestamp(),
       });
-
-      await docRef.update({'uid': docRef.id});
-      return docRef.id;
     }
+    await docRef.update({'uid': docRef.id});
+    return docRef.id;
   }
 
   /// Buscar mesas (snapshot único)
-  Future<QuerySnapshot> buscarMesas(String gerenteUid) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('Usuarios')
-        .doc(gerenteUid)
-        .get();
-    final userData = doc.data() as Map<String, dynamic>?;
-    final Uid = userData?['gerenteUid'] as String?;
-    return await _firestore
+  Future<QuerySnapshot> buscarMesas(String gerenteId) async {
+    return _firestore
         .collection('Mesas')
+        .where('gerenteUid', isEqualTo: gerenteId)
         .orderBy('numero')
-        .where('gerenteUid', isEqualTo: Uid)
         .get();
   }
 
-  /// Stream de mesas (tempo real)
-  Future<Stream<QuerySnapshot<Object?>>> streamMesas(String gerenteUid) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('Usuarios')
-        .doc(gerenteUid)
-        .get();
-    final userData = doc.data() as Map<String, dynamic>?;
-    final Uid = userData?['gerenteUid'] as String?;
-
+  /// Listar mesas em tempo real
+  Stream<QuerySnapshot> listarMesasTempoReal(String gerenteId) {
+    // Atenção: O uso de orderBy e where juntos pode exigir a criação de um índice composto
+    // no console do Firebase para evitar erros de runtime. O Flutter CLI geralmente
+    // fornece um link para criar o índice se for necessário.
     return _firestore
         .collection('Mesas')
+        .where('gerenteUid', isEqualTo: gerenteId)
         .orderBy('numero')
-        .where('gerenteUid', isEqualTo: Uid)
         .snapshots();
   }
 
@@ -104,13 +95,16 @@ class MesaFirebase {
     return snapshot.docs.map((doc) => documentParaMesa(doc)).toList();
   }
 
-  /// Verificar se já existe mesa com mesmo número
-  Future<bool> verificarMesaExistente(String gerenteId, int numero) async {
-    QuerySnapshot snapshot = await _firestore
+  /// Verificar se já existe mesa com esse número
+  Future<bool> verificarMesaExistente(int numero, String gerenteId) async {
+    final querySnapshot = await _firestore
         .collection('Mesas')
-        .where('numero', isEqualTo: numero)
         .where('gerenteUid', isEqualTo: gerenteId)
+        .where('numero', isEqualTo: numero)
+        .limit(1)
         .get();
-    return snapshot.docs.isNotEmpty;
+    return querySnapshot.docs.isNotEmpty;
   }
 }
+
+    

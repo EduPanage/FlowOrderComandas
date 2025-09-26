@@ -1,47 +1,151 @@
 import 'package:flutter/material.dart';
-import 'package:floworder/controller/MesaController.dart';
-import 'package:floworder/models/Mesa.dart';
-import 'package:floworder/view/TelaPedidos.dart';
 import '../auxiliar/Cores.dart';
-import 'BarraLateral.dart';
+import '../controller/MesaController.dart';
+import '../models/Mesa.dart';
+import 'TelaPedidos.dart';
 
-class TelaMesas extends StatefulWidget {
-  const TelaMesas({Key? key}) : super(key: key);
-
+class MesasScreen extends StatefulWidget {
   @override
-  State<TelaMesas> createState() => _TelaMesasState();
+  _MesasScreenState createState() => _MesasScreenState();
 }
 
-class _TelaMesasState extends State<TelaMesas> {
+class _MesasScreenState extends State<MesasScreen> {
   final MesaController _mesaController = MesaController();
+  final TextEditingController _searchController = TextEditingController();
+  String _filtro = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _filtro = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _abrirPedido(BuildContext context, Mesa mesa) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PedidoScreen(mesa: mesa),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Usa a cor de fundo preta da classe Cores
       backgroundColor: Cores.backgroundBlack,
-      body: Row(
+      appBar: AppBar(
+        title: Text('Mesas', style: TextStyle(color: Cores.textWhite)),
+        // Usa a cor de fundo preta da classe Cores
+        backgroundColor: Cores.backgroundBlack,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.add, color: Cores.textWhite),
+            onPressed: () {
+              // TODO: Implementar cadastro de nova mesa
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh, color: Cores.textWhite),
+            onPressed: () {
+              setState(() {});
+            },
+          ),
+        ],
+      ),
+      body: Column(
         children: [
-          const Barralateral(currentRoute: '/mesas'),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Mesas',
-                    style: TextStyle(
-                      color: Cores.textWhite,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: _buildMesasGrid(),
-                  ),
-                ],
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(color: Cores.textWhite),
+              decoration: InputDecoration(
+                labelText: 'Buscar Mesa',
+                labelStyle: TextStyle(color: Cores.textGray),
+                prefixIcon: Icon(Icons.search, color: Cores.textGray),
+                filled: true,
+                // Usa a cor de fundo do card
+                fillColor: Cores.cardBlack,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  // Usa a cor da borda
+                  borderSide: BorderSide(color: Cores.borderGray),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  // Usa a cor da borda
+                  borderSide: BorderSide(color: Cores.borderGray),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  // Usa a cor vermelha principal para o foco
+                  borderSide: BorderSide(color: Cores.primaryRed, width: 2),
+                ),
               ),
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<Mesa>>(
+              stream: _mesaController.listarMesasTempoReal(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    // Usa a cor de texto branca
+                    child: CircularProgressIndicator(color: Cores.textWhite),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    // Usa a cor vermelha para erros
+                    child: Text(
+                      'Erro: ${snapshot.error}',
+                      style: TextStyle(color: Cores.errorRed),
+                    ),
+                  );
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Nenhuma mesa encontrada.',
+                      style: TextStyle(color: Cores.textGray),
+                    ),
+                  );
+                }
+
+                final mesas = snapshot.data!
+                    .where((mesa) => mesa.nome
+                        .toLowerCase()
+                        .contains(_filtro.toLowerCase()))
+                    .toList();
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount:
+                        MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                    childAspectRatio: 0.8,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: mesas.length,
+                  itemBuilder: (context, index) {
+                    final mesa = mesas[index];
+                    return _buildMesaCard(context, mesa);
+                  },
+                );
+              },
             ),
           ),
         ],
@@ -49,88 +153,48 @@ class _TelaMesasState extends State<TelaMesas> {
     );
   }
 
-  Widget _buildMesasGrid() {
-    return StreamBuilder<List<Mesa>>(
-      stream: _mesaController.streamMesas(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(color: Cores.primaryRed),
-          );
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              "Erro ao carregar mesas: ${snapshot.error}",
-              style: TextStyle(color: Cores.textGray),
-            ),
-          );
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.table_bar, size: 80, color: Cores.textGray),
-                const SizedBox(height: 16),
-                Text(
-                  'Nenhuma mesa encontrada',
-                  style: TextStyle(color: Cores.textGray, fontSize: 18),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final mesas = snapshot.data!;
-        return GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-          ),
-          itemCount: mesas.length,
-          itemBuilder: (context, index) {
-            final mesa = mesas[index];
-            return _buildMesaCard(mesa);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMesaCard(Mesa mesa) {
+  Widget _buildMesaCard(BuildContext context, Mesa mesa) {
     return InkWell(
-      onTap: () {
-        // Redireciona para a TelaPedidos sem passar o parâmetro mesa
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const TelaPedidos()),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Cores.cardBlack,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Cores.borderGray),
+      onTap: () => _abrirPedido(context, mesa),
+      child: Card(
+        // Usa a cor de fundo do card
+        color: Cores.cardBlack,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          // Usa a cor vermelha principal com opacidade para a borda
+          side: BorderSide(color: Cores.primaryRed.withOpacity(0.5), width: 1.5),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Mesa ${mesa.numero}',
-              style: TextStyle(
-                color: Cores.textWhite,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Usa a cor vermelha principal para o ícone
+              Icon(Icons.table_chart, color: Cores.primaryRed, size: 48),
+              SizedBox(height: 8),
+              Text(
+                mesa.nome,
+                style: TextStyle(
+                  // Usa a cor de texto branca
+                  color: Cores.textWhite,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              mesa.nome,
-              style: TextStyle(color: Cores.textGray),
-            ),
-          ],
+              SizedBox(height: 4),
+              Text(
+                'Número: ${mesa.numero}',
+                style: TextStyle(
+                  // Usa a cor de texto cinza
+                  color: Cores.textGray,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,40 +1,39 @@
+import 'ItemCardapio.dart';
+
 class Cardapio {
-  String uid;
+  String? uid;
   String nome;
-  String descricao;
-  double preco;
-  bool ativo;
   String categoria;
-  String? observacao;
+  bool ativo;
+  List<ItemCardapio> itens;
 
   Cardapio({
-    this.uid = '',
+    this.uid,
     required this.nome,
-    required this.descricao,
-    required this.preco,
-    this.ativo = true,
-    this.categoria = 'Outros',
+    required this.categoria,
+    required this.ativo,
+    this.itens = const [],
   });
 
   Map<String, dynamic> toMap() {
     return {
+      'uid': uid,
       'nome': nome,
-      'descricao': descricao,
-      'preco': preco,
-      'ativo': ativo,
       'categoria': categoria,
+      'ativo': ativo,
+      'itens': itens.map((item) => item.toMap()).toList(),
     };
   }
 
-  factory Cardapio.fromMap(String id, Map<String, dynamic> data) {
+  factory Cardapio.fromMap(Map<String, dynamic> map, String uid) {
+    var itensList = map['itens'] as List? ?? [];
+    List<ItemCardapio> itens = itensList.map((item) => ItemCardapio.fromMap(item)).toList();
     return Cardapio(
-      uid: id,
-      nome: data['nome'] ?? '',
-      descricao: data['descricao'] ?? '',
-      preco: (data['preco'] ?? 0).toDouble(),
-      ativo: data['ativo'] ?? true,
-      categoria: data['categoria'] ?? 'Outros',
+      uid: uid,
+      nome: map['nome'] ?? '',
+      categoria: map['categoria'] ?? '',
+      ativo: map['ativo'] ?? false,
+      itens: itens,
     );
   }
-
 }
