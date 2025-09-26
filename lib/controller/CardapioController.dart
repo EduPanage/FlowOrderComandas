@@ -53,7 +53,9 @@ class CardapioController {
     }
 
     try {
-      QuerySnapshot snapshot = await _cardapioFirebase.buscarCardapiosAtivos(userId);
+      QuerySnapshot snapshot = await _cardapioFirebase.buscarCardapiosAtivos(
+        userId,
+      );
       return _cardapioFirebase.querySnapshotParaCardapios(snapshot);
     } catch (e) {
       throw Exception('Erro ao buscar cardápios ativos: ${e.toString()}');
@@ -102,14 +104,16 @@ class CardapioController {
     }
 
     try {
-      await _cardapioFirebase.suspenderCardapio(
-        userId,
-        cardapioUid,
-        suspender,
-      );
-      return suspender ? 'Cardápio suspenso com sucesso' : 'Cardápio reativado com sucesso';
+      await _cardapioFirebase.suspenderCardapio(userId, cardapioUid, suspender);
+      return suspender
+          ? 'Cardápio suspenso com sucesso'
+          : 'Cardápio reativado com sucesso';
     } catch (e) {
       throw Exception('Erro ao suspender/reativar cardápio: ${e.toString()}');
     }
+  }
+
+  Stream<List<ItemCardapio>> listarItensAtivosTempoReal() {
+    return _cardapioFirebase.listarItensCardapioTempoReal();
   }
 }

@@ -1,8 +1,10 @@
+// lib/view/TelaHome.dart
+
+import 'package:floworder/auxiliar/Cores.dart';
+import 'package:floworder/controller/MesaController.dart';
+import 'package:floworder/models/Mesa.dart';
 import 'package:flutter/material.dart';
-import '../auxiliar/Cores.dart';
-import '../controller/MesaController.dart';
-import '../models/Mesa.dart';
-import 'TelaCriarPedido.dart';
+import 'TelaGerenciarMesa.dart'; 
 
 class TelaHome extends StatefulWidget {
   const TelaHome({super.key});
@@ -13,157 +15,162 @@ class TelaHome extends StatefulWidget {
 
 class _TelaHomeState extends State<TelaHome> {
   final MesaController _mesaController = MesaController();
-  Stream<List<Mesa>>? _mesasStream;
 
-  @override
-  void initState() {
-    super.initState();
-    // Inicializa o Stream para carregar as mesas em tempo real
-    try {
-      _mesasStream = _mesaController.listarMesasTempoReal();
-    } catch (e) {
-      // Em caso de erro (ex: usuário não logado), tratamos no builder
-      _mesasStream = null;
-      print("Erro ao iniciar stream de mesas: $e");
+  // Função para determinar a cor do card com base no status da mesa
+  Color _getMesaColor(String status) {
+    switch (status) {
+      case 'Ocupada':
+      case 'Em Uso': 
+        return Cores.primaryRed.withOpacity(0.5);
+      case 'Reservada':
+        return Cores.lightRed.withOpacity(0.5);
+      case 'Livre':
+      default:
+        return Cores.cardBlack;
     }
   }
 
-  // Função de navegação que usa a rota nomeada
-  void _abrirCriarPedido(BuildContext context, Mesa mesa) {
-    // Navega para a rota '/criarPedido' passando a mesa como argumento
-    Navigator.of(context).pushNamed('/criarPedido', arguments: mesa);
-  }
+  // Card de mesa simplificado para a TelaHome
+  Widget _buildMesaCard(BuildContext context, Mesa mesa) {
+    final statusColor = _getMesaColor(mesa.status);
 
-  @override
-  Widget build(BuildContext context) {
-    // Removemos o Row e o BarraLateral, pois o Garçom usa apenas a listagem.
-    return Scaffold(
-      backgroundColor: Cores.backgroundBlack,
-      appBar: AppBar(
-        title: const Text(
-          'Selecione a Mesa',
-          style: TextStyle(color: Cores.textWhite, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Cores.backgroundBlack,
-        elevation: 0,
-        automaticallyImplyLeading: false, // Garçom não volta do Home
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: StreamBuilder<List<Mesa>>(
-            stream: _mesasStream,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                // Se houver um erro (ex: regras de segurança, ou 'nenhum gerente logado')
-                return Center(
-                  child: Text(
-                    'Erro ao carregar mesas: ${snapshot.error.toString()}',
-                    style: const TextStyle(
-                      color: Cores.primaryRed,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                );
-              }
-
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: CircularProgressIndicator(color: Cores.primaryRed),
-                );
-              }
-
-              final mesas = snapshot.data ?? [];
-
-              if (mesas.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'Nenhuma mesa cadastrada. Fale com o gerente.',
-                    style: TextStyle(color: Cores.textGray, fontSize: 18),
-                  ),
-                );
-              }
-
-              // Conteúdo principal: Grid de Mesas
-              return GridView.builder(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 200, // Tamanho máximo de cada item
-                  childAspectRatio: 1.0,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                ),
-                itemCount: mesas.length,
-                itemBuilder: (context, index) {
-                  final mesa = mesas[index];
-                  return _buildMesaCard(context, mesa);
-                },
-              );
-            },
+    return InkWell(
+      onTap: () {
+        // Navega para a nova tela de gerenciamento da mesa
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            // Passa a mesa para a próxima tela
+            builder: (context) => TelaGerenciarMesa(mesa: mesa), 
           ),
+        );
+      },
+      child: Card(
+        color: statusColor,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Cores.borderGray, width: 1),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.table_bar, color: Cores.textWhite, size: 40),
+            const SizedBox(height: 8),
+            Text(
+              mesa.nome,
+              style: TextStyle(
+                color: Cores.textWhite,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Cores.backgroundBlack.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                mesa.status,
+                style: TextStyle(
+                  color: Cores.textWhite,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Construção do Card de Mesa (adaptado do antigo TelaMesas.dart)
-  Widget _buildMesaCard(BuildContext context, Mesa mesa) {
-    Color cardColor;
-    Color iconColor;
-    String statusText;
-
-    // Lógica para determinar o estilo com base no status
-    switch (mesa.status) {
-      case 'Ocupada':
-        cardColor = Cores.primaryRed.withOpacity(0.2);
-        iconColor = Cores.primaryRed;
-        statusText = 'Ocupada';
-        break;
-      case 'Livre':
-      default:
-        cardColor = Cores.cardBlack;
-        iconColor = Cores.textGray;
-        statusText = 'Livre';
-        break;
-    }
-
-    return InkWell(
-      onTap: () => _abrirCriarPedido(context, mesa),
-      child: Card(
-        color: cardColor,
-        elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: iconColor, width: 2),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.table_bar, color: iconColor, size: 48),
-              const SizedBox(height: 8),
-              Text(
-                mesa.nome,
-                style: const TextStyle(
-                  color: Cores.textWhite,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                statusText,
-                style: TextStyle(
-                  color: iconColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Cores.backgroundBlack,
+      appBar: AppBar(
+        // Removendo a BarraLateral e usando um AppBar simples para o título
+        title: const Text(
+          'Visão Geral do Estabelecimento - FlowOrder',
+          style: TextStyle(
+            color: Cores.textWhite,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
+        ),
+        automaticallyImplyLeading: false, // Remove a seta de voltar se for a rota principal
+        backgroundColor: Cores.cardBlack, // Fundo do AppBar
+        actions: [
+          // Exemplo de botão de Logout (opcional)
+          IconButton(
+            icon: const Icon(Icons.exit_to_app, color: Cores.primaryRed),
+            onPressed: () {
+              // TODO: Implementar a lógica de Logout aqui
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ação de Logout (Para ser implementada)!')));
+            },
+          ),
+          const SizedBox(width: 20),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Status das Mesas:',
+              style: TextStyle(
+                color: Cores.textGray,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            Expanded(
+              child: StreamBuilder<List<Mesa>>(
+                stream: _mesaController.listarMesasTempoReal(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                        child: CircularProgressIndicator(color: Cores.primaryRed));
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Erro ao carregar mesas: ${snapshot.error}',
+                            style: TextStyle(color: Cores.primaryRed)));
+                  }
+
+                  final mesas = snapshot.data ?? [];
+
+                  if (mesas.isEmpty) {
+                    return const Center(
+                      child: Text('Nenhuma mesa cadastrada.',
+                          style: TextStyle(color: Cores.textGray)),
+                    );
+                  }
+
+                  // Layout de Grid para as Mesas
+                  return GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5, // Número de colunas
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.0, // Cards quadrados
+                    ),
+                    itemCount: mesas.length,
+                    itemBuilder: (context, index) {
+                      return _buildMesaCard(context, mesas[index]);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
