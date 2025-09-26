@@ -323,7 +323,7 @@ class _telalogin extends State<Tela_Login> {
                               color: Colors.red[400],
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.underline,
+                              decoration: TextDecoration.none,
                             ),
                           ),
                         ),
@@ -346,7 +346,7 @@ class _telalogin extends State<Tela_Login> {
                               style: TextStyle(
                                 color: Colors.red[400],
                                 fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
+                                decoration: TextDecoration.none,
                               ),
                             ),
                           ),

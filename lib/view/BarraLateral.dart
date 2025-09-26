@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:floworder/auxiliar/Cores.dart';
+import '../auxiliar/Cores.dart';
 
 class BarraLateral extends StatelessWidget {
   final String currentRoute;
@@ -13,98 +13,84 @@ class BarraLateral extends StatelessWidget {
       color: Cores.cardBlack,
       child: Column(
         children: [
-          _buildLogo(),
-          const SizedBox(height: 32),
+          // Área do logo no topo
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Image.asset('logo/Icone_FlowOrder.png', height: 60),
+          ),
+          const Divider(color: Cores.borderGray, thickness: 1),
+          // Itens de navegação
+          _buildMenuItem(context, 'Inicio', Icons.dashboard, '/home'),
           _buildMenuItem(
             context,
-            icon: Icons.home,
-            label: 'Home',
-            route: '/home',
+            'Cardápio',
+            Icons.restaurant_menu,
+            '/cardapio',
           ),
-          _buildMenuItem(
-            context,
-            icon: Icons.menu_book,
-            label: 'Cardápio',
-            route: '/cardapio',
-          ),
-          _buildMenuItem(
-            context,
-            icon: Icons.table_bar,
-            label: 'Mesas',
-            route: '/mesas',
-          ),
-          _buildMenuItem(
-            context,
-            icon: Icons.assignment,
-            label: 'Pedidos',
-            route: '/pedidos',
-          ),
+          _buildMenuItem(context, 'Pedidos', Icons.list_alt, '/pedidos'),
+          _buildMenuItem(context, 'Mesas', Icons.table_chart, '/mesas'),
+
           const Spacer(),
-          _buildMenuItem(
-            context,
-            icon: Icons.logout,
-            label: 'Sair',
-            route: '/',
-            onTap: () {
-              Navigator.of(context).pushReplacementNamed('/');
-            },
-          ),
-          const SizedBox(height: 16),
+          // Botão de sair
+          _buildExitButton(context),
         ],
       ),
     );
   }
 
-  Widget _buildLogo() {
+  Widget _buildMenuItem(
+    BuildContext context,
+    String title,
+    IconData icon,
+    String route,
+  ) {
+    bool isSelected = currentRoute == route;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: const BoxDecoration(
-        color: Cores.backgroundBlack,
-        borderRadius: BorderRadius.only(
-          bottomRight: Radius.circular(16),
-        ),
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Cores.primaryRed.withOpacity(0.2)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Center(
-        child: Image.asset(
-          'logo/Icone_FlowOrder.png',
-          height: 80,
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isSelected ? Cores.primaryRed : Cores.textGray,
         ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Cores.textWhite : Cores.textGray,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        onTap: () {
+          if (ModalRoute.of(context)?.settings.name != route) {
+            Navigator.pushReplacementNamed(context, route);
+          }
+        },
       ),
     );
   }
 
-  Widget _buildMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String route,
-    VoidCallback? onTap,
-  }) {
-    final bool isSelected = currentRoute == route;
-    return InkWell(
-      onTap: onTap ?? () => Navigator.pushReplacementNamed(context, route),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Cores.primaryRed.withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: Cores.primaryRed, width: 2) : null,
+  Widget _buildExitButton(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Cores.primaryRed.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.exit_to_app, color: Cores.primaryRed),
+        title: const Text(
+          'Sair',
+          style: TextStyle(color: Cores.textWhite, fontWeight: FontWeight.bold),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: Cores.textWhite),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: TextStyle(
-                color: Cores.textWhite,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+        onTap: () {
+          // TODO: Implementar a lógica de logout.
+          // Navigator.pushReplacementNamed(context, '/login');
+        },
       ),
     );
   }
