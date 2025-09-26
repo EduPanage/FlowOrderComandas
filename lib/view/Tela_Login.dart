@@ -225,7 +225,7 @@ class _telalogin extends State<Tela_Login> {
                       SizedBox(height: 8),
 
                       Text(
-                        'Login no FlowOrder',
+                        'Sistema de Comandas - Garçom',
                         style: TextStyle(color: Colors.white70, fontSize: 16),
                       ),
 

@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:firebase_core/firebase_core.dart'; // Importa o núcleo do Firebase
+import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+
 import 'view/Tela_Login.dart';
 import 'view/TelaHome.dart';
-import 'view/TelaPedidos.dart';
-import 'view/TelaMesas.dart';
-import 'view/TelaCardapio.dart';
+import 'models/Mesa.dart';
+import 'view/TelaCriarPedido.dart';
 
 // O ponto de entrada principal do aplicativo.
 void main() async {
-  // Garante que o Flutter e o Firebase estão prontos antes de iniciar
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
@@ -39,7 +38,7 @@ class FlowOrderGarcomApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'FlowOrder',
+      title: 'FlowOrder - Garçom',
       theme: ThemeData(
         scaffoldBackgroundColor: Cores.backgroundBlack,
         colorScheme: const ColorScheme.dark(
@@ -52,25 +51,24 @@ class FlowOrderGarcomApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => Tela_Login(),
-        '/home': (context) => TelaHome(),
-        '/pedidos': (context) => TelaPedidos(),
-        '/mesas': (context) => MesasScreen(),
-        '/cardapio': (context) => TelaCardapio(),
+        '/home': (context) => const TelaHome(),
       },
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/':
             return MaterialPageRoute(builder: (context) => Tela_Login());
           case '/home':
-            return MaterialPageRoute(builder: (context) => TelaHome());
-          case '/pedidos':
-            return MaterialPageRoute(builder: (context) => TelaPedidos());
-          case '/mesas':
-            return MaterialPageRoute(builder: (context) => MesasScreen());
-          case '/cardapio':
-            return MaterialPageRoute(builder: (context) => TelaCardapio());
+            return MaterialPageRoute(builder: (context) => const TelaHome());
+
+          case '/criarPedido':
+            // 'Mesa' agora é reconhecida
+            final args = settings.arguments as Mesa;
+            return MaterialPageRoute(
+              builder: (context) => TelaCriarPedido(mesa: args),
+            );
+
           default:
-            return null;
+            return MaterialPageRoute(builder: (context) => Tela_Login());
         }
       },
     );

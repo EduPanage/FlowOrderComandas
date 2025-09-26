@@ -1,36 +1,30 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Mesa {
-  final String? uid;
-  final String nome;
-  final int numero;
-  final String? gerenteUid;
-  final Timestamp? criadoEm;
+  String uid;
+  String nome;
+  int numero;
+  String status; 
 
   Mesa({
-    this.uid,
+    required this.uid,
     required this.nome,
     required this.numero,
-    this.gerenteUid,
-    this.criadoEm,
+    this.status = 'Livre', 
   });
 
-  factory Mesa.fromMap(Map<String, dynamic> map, String uid) {
+  factory Mesa.fromJson(Map<String, dynamic> json, String uid) {
     return Mesa(
       uid: uid,
-      nome: map['nome'] ?? 'Mesa ${map['numero']}',
-      numero: map['numero'] ?? 0,
-      gerenteUid: map['gerenteUid'],
-      criadoEm: map['criadoEm'],
+      nome: json['nome'] ?? 'Mesa Sem Nome',
+      numero: json['numero'] ?? 0,
+      status: json['status'] ?? 'Livre', 
     );
   }
-
-  Map<String, dynamic> toMap() {
+  
+  Map<String, dynamic> toJson() {
     return {
       'nome': nome,
       'numero': numero,
-      'gerenteUid': gerenteUid,
-      'criadoEm': criadoEm,
+      'status': status,
     };
   }
 }
