@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../auxiliar/Cores.dart';
 import '../controller/MesaController.dart';
 import '../models/Mesa.dart';
-import 'TelaCriarPedido.dart'; 
+import 'TelaCriarPedido.dart';
 
 class TelaHome extends StatefulWidget {
   const TelaHome({super.key});
@@ -13,157 +13,139 @@ class TelaHome extends StatefulWidget {
 
 class _TelaHomeState extends State<TelaHome> {
   final MesaController _mesaController = MesaController();
-  final TextEditingController _searchController = TextEditingController();
-  String _filtro = '';
+  Stream<List<Mesa>>? _mesasStream;
 
   @override
   void initState() {
     super.initState();
-    // Lógica de filtro para a busca
-    _searchController.addListener(() {
-      setState(() {
-        _filtro = _searchController.text;
-      });
-    });
+    // Inicializa o Stream para carregar as mesas em tempo real
+    try {
+      _mesasStream = _mesaController.listarMesasTempoReal();
+    } catch (e) {
+      // Em caso de erro (ex: usuário não logado), tratamos no builder
+      _mesasStream = null;
+      print("Erro ao iniciar stream de mesas: $e");
+    }
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  // Novo método de navegação: abre a tela de criação de pedido para a Mesa
-  void _abrirCriacaoPedido(Mesa mesa) {
-    // Navega para a nova tela, passando a Mesa como argumento
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TelaCriarPedido(mesa: mesa),
-      ),
-    );
+  // Função de navegação que usa a rota nomeada
+  void _abrirCriarPedido(BuildContext context, Mesa mesa) {
+    // Navega para a rota '/criarPedido' passando a mesa como argumento
+    Navigator.of(context).pushNamed('/criarPedido', arguments: mesa);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Removemos o Row e o BarraLateral, pois o Garçom usa apenas a listagem.
     return Scaffold(
       backgroundColor: Cores.backgroundBlack,
       appBar: AppBar(
-        title: Text('Selecione a Mesa', style: TextStyle(color: Cores.textWhite)),
+        title: const Text(
+          'Selecione a Mesa',
+          style: TextStyle(color: Cores.textWhite, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Cores.backgroundBlack,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: Cores.textWhite),
-            onPressed: () {
-              setState(() {});
+        automaticallyImplyLeading: false, // Garçom não volta do Home
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: StreamBuilder<List<Mesa>>(
+            stream: _mesasStream,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                // Se houver um erro (ex: regras de segurança, ou 'nenhum gerente logado')
+                return Center(
+                  child: Text(
+                    'Erro ao carregar mesas: ${snapshot.error.toString()}',
+                    style: const TextStyle(
+                      color: Cores.primaryRed,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Cores.primaryRed),
+                );
+              }
+
+              final mesas = snapshot.data ?? [];
+
+              if (mesas.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Nenhuma mesa cadastrada. Fale com o gerente.',
+                    style: TextStyle(color: Cores.textGray, fontSize: 18),
+                  ),
+                );
+              }
+
+              // Conteúdo principal: Grid de Mesas
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 200, // Tamanho máximo de cada item
+                  childAspectRatio: 1.0,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                ),
+                itemCount: mesas.length,
+                itemBuilder: (context, index) {
+                  final mesa = mesas[index];
+                  return _buildMesaCard(context, mesa);
+                },
+              );
             },
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: Cores.textWhite),
-              decoration: InputDecoration(
-                labelText: 'Buscar Mesa',
-                labelStyle: TextStyle(color: Cores.textGray),
-                prefixIcon: Icon(Icons.search, color: Cores.textGray),
-                filled: true,
-                fillColor: Cores.cardBlack,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Cores.borderGray),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Cores.borderGray),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Cores.primaryRed, width: 2),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<List<Mesa>>(
-              stream: _mesaController.listarMesasTempoReal(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: Cores.primaryRed));
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Erro: ${snapshot.error}', style: TextStyle(color: Cores.primaryRed)));
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: Text('Nenhuma mesa cadastrada.', style: TextStyle(color: Cores.textGray)));
-                }
-
-                final mesas = snapshot.data!
-                    .where((mesa) => mesa.nome.toLowerCase().contains(_filtro.toLowerCase()))
-                    .toList();
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, // 2 colunas para focar no tablet/desktop
-                    childAspectRatio: 1.0,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: mesas.length,
-                  itemBuilder: (context, index) {
-                    final mesa = mesas[index];
-                    return _buildMesaCard(context, mesa);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  // Card simplificado para o garçom
+  // Construção do Card de Mesa (adaptado do antigo TelaMesas.dart)
   Widget _buildMesaCard(BuildContext context, Mesa mesa) {
-    Color statusColor;
+    Color cardColor;
+    Color iconColor;
+    String statusText;
+
+    // Lógica para determinar o estilo com base no status
     switch (mesa.status) {
       case 'Ocupada':
-        statusColor = Cores.primaryRed;
-        break;
-      case 'Reservada':
-        statusColor = Colors.orange;
+        cardColor = Cores.primaryRed.withOpacity(0.2);
+        iconColor = Cores.primaryRed;
+        statusText = 'Ocupada';
         break;
       case 'Livre':
       default:
-        statusColor = Colors.green;
+        cardColor = Cores.cardBlack;
+        iconColor = Cores.textGray;
+        statusText = 'Livre';
         break;
     }
 
     return InkWell(
-      onTap: () => _abrirCriacaoPedido(mesa),
+      onTap: () => _abrirCriarPedido(context, mesa),
       child: Card(
-        color: Cores.cardBlack,
+        color: cardColor,
         elevation: 8,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: statusColor, width: 2),
+          side: BorderSide(color: iconColor, width: 2),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.table_chart, color: statusColor, size: 48),
+              Icon(Icons.table_bar, color: iconColor, size: 48),
               const SizedBox(height: 8),
               Text(
                 mesa.nome,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Cores.textWhite,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -172,9 +154,9 @@ class _TelaHomeState extends State<TelaHome> {
               ),
               const SizedBox(height: 4),
               Text(
-                mesa.status,
+                statusText,
                 style: TextStyle(
-                  color: statusColor,
+                  color: iconColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),

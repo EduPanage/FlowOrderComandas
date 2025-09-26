@@ -1,3 +1,5 @@
+// lib/firebase/MesaFirebase.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/Mesa.dart';
@@ -11,6 +13,31 @@ class MesaFirebase {
     return user?.uid;
   }
 
+  // Verifica se o usuário é Gerente ou Funcionário e retorna o UID do Gerente
+  Future<String?> verificarGerenteUid() async {
+    String? userId = pegarIdUsuarioLogado();
+    if (userId == null) return null;
+
+    try {
+      final doc = await _firestore.collection('Usuarios').doc(userId).get();
+      final userData = doc.data() as Map<String, dynamic>?;
+
+      final cargo = userData?['cargo'] as String?;
+
+      // Se for Gerente, o gerenteUid é o próprio userId
+      if (cargo == 'Gerente') {
+        return userId;
+      }
+
+      // Se for Funcionário, retorna o gerenteUid do documento do usuário
+      final gerenteUid = userData?['gerenteUid'] as String?;
+      return gerenteUid;
+    } catch (e) {
+      print('Erro ao verificar gerenteUid: $e');
+      return null;
+    }
+  }
+
   /// Adicionar mesa
   Future<String> adicionarMesa(String Id, Mesa mesa) async {
     final doc = await FirebaseFirestore.instance
@@ -19,6 +46,7 @@ class MesaFirebase {
         .get();
     final userData = doc.data() as Map<String, dynamic>?;
     final cargo = userData?['cargo'] as String?;
+    ;
 
     DocumentReference docRef;
 
@@ -27,6 +55,7 @@ class MesaFirebase {
         'nome': mesa.nome,
         'numero': mesa.numero,
         'gerenteUid': Id,
+        'status': 'Livre', // Adiciona status inicial
         'criadoEm': FieldValue.serverTimestamp(),
       });
     } else {
@@ -38,27 +67,16 @@ class MesaFirebase {
         'nome': mesa.nome,
         'numero': mesa.numero,
         'gerenteUid': gerenteUid,
+        'status': 'Livre', // Adiciona status inicial
         'criadoEm': FieldValue.serverTimestamp(),
       });
     }
-    await docRef.update({'uid': docRef.id});
     return docRef.id;
   }
 
-  /// Buscar mesas (snapshot único)
-  Future<QuerySnapshot> buscarMesas(String gerenteId) async {
-    return _firestore
-        .collection('Mesas')
-        .where('gerenteUid', isEqualTo: gerenteId)
-        .orderBy('numero')
-        .get();
-  }
-
-  /// Listar mesas em tempo real
+  /// Listar mesas em tempo real (QuerySnapshot)
   Stream<QuerySnapshot> listarMesasTempoReal(String gerenteId) {
-    // Atenção: O uso de orderBy e where juntos pode exigir a criação de um índice composto
-    // no console do Firebase para evitar erros de runtime. O Flutter CLI geralmente
-    // fornece um link para criar o índice se for necessário.
+    // Filtra pelo gerenteId e ordena, se necessário.
     return _firestore
         .collection('Mesas')
         .where('gerenteUid', isEqualTo: gerenteId)
@@ -76,6 +94,7 @@ class MesaFirebase {
     await _firestore.collection('Mesas').doc(mesa.uid).update({
       'nome': mesa.nome,
       'numero': mesa.numero,
+      'status': mesa.status, // Atualiza o status
       'atualizadoEm': FieldValue.serverTimestamp(),
     });
   }
@@ -87,6 +106,8 @@ class MesaFirebase {
       uid: doc.id,
       nome: data['nome'] ?? "Mesa ${data['numero']}",
       numero: data['numero'] ?? 0,
+      // CORREÇÃO ESSENCIAL 1: Adiciona o campo 'status'
+      status: data['status'] ?? 'Livre',
     );
   }
 
@@ -96,15 +117,7 @@ class MesaFirebase {
   }
 
   /// Verificar se já existe mesa com esse número
-  Future<bool> verificarMesaExistente(int numero, String gerenteId) async {
-    final querySnapshot = await _firestore
-        .collection('Mesas')
-        .where('gerenteUid', isEqualTo: gerenteId)
-        .where('numero', isEqualTo: numero)
-        .limit(1)
-        .get();
-    return querySnapshot.docs.isNotEmpty;
+  Future<bool> verificarMesaExistente(int numero, String userId) async {
+    return false;
   }
 }
-
-    

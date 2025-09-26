@@ -17,7 +17,12 @@ class MesaController {
         return 'Erro: Mesa já cadastrada';
       }
 
+      if (mesa.nome.isEmpty) {
+        mesa.nome = "Mesa ${mesa.numero}";
+      }
+
       String mesaId = await _mesaFirebase.adicionarMesa(userId, mesa);
+      mesa.uid = mesaId;
 
       return 'Mesa cadastrada com sucesso';
     } catch (e) {
@@ -25,15 +30,18 @@ class MesaController {
     }
   }
 
-  /// Buscar mesas do gerente logado (snapshot único)
   Future<List<Mesa>> buscarMesas() async {
-    String? userId = _mesaFirebase.pegarIdUsuarioLogado();
-    if (userId == null) {
-      throw Exception('Erro: Nenhum Gerente logado');
+    String? gerenteId = await _mesaFirebase.verificarGerenteUid();
+    if (gerenteId == null) {
+      return []; // Retorna lista vazia se não houver gerente
     }
 
     try {
-      QuerySnapshot snapshot = await _mesaFirebase.buscarMesas(userId);
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('Mesas')
+          .where('gerenteUid', isEqualTo: gerenteId)
+          .orderBy('numero')
+          .get();
       return _mesaFirebase.querySnapshotParaMesas(snapshot);
     } catch (e) {
       throw Exception('Erro ao buscar mesas: ${e.toString()}');
@@ -41,15 +49,18 @@ class MesaController {
   }
 
   /// Listar mesas em tempo real (stream)
-  Stream<List<Mesa>> listarMesasTempoReal() {
-    String? userId = _mesaFirebase.pegarIdUsuarioLogado();
-    if (userId == null) {
-      throw Exception('Erro: Nenhum Gerente logado');
+  Stream<List<Mesa>> listarMesasTempoReal() async* {
+    String? gerenteId = await _mesaFirebase.verificarGerenteUid();
+
+    if (gerenteId == null) {
+      // Se não houver gerenteId, retornamos um stream vazio
+      yield* Stream.value([]);
+      return;
     }
-  
-    return _mesaFirebase.listarMesasTempoReal(userId).map((snapshot) {
-      return _mesaFirebase.querySnapshotParaMesas(snapshot);
-    });
+
+    yield* _mesaFirebase
+        .listarMesasTempoReal(gerenteId)
+        .map((snapshot) => _mesaFirebase.querySnapshotParaMesas(snapshot));
   }
 
   /// Deletar mesa
