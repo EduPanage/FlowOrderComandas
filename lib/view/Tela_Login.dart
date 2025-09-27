@@ -328,30 +328,6 @@ class _telalogin extends State<Tela_Login> {
                           ),
                         ),
                       ),
-
-                      SizedBox(height: 30),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Não tem uma conta? ',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(context, '/telaCadastro');
-                            },
-                            child: Text(
-                              'Criar conta',
-                              style: TextStyle(
-                                color: Colors.red[400],
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),

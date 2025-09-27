@@ -4,7 +4,9 @@ import 'package:floworder/auxiliar/Cores.dart';
 import 'package:floworder/controller/MesaController.dart';
 import 'package:floworder/models/Mesa.dart';
 import 'package:flutter/material.dart';
-import 'TelaGerenciarMesa.dart'; 
+import 'TelaGerenciarMesa.dart';
+// 1. IMPORTAR a classe LoginFirebase
+import '../firebase/LoginFirebase.dart';
 
 class TelaHome extends StatefulWidget {
   const TelaHome({super.key});
@@ -15,12 +17,14 @@ class TelaHome extends StatefulWidget {
 
 class _TelaHomeState extends State<TelaHome> {
   final MesaController _mesaController = MesaController();
+  // 2. CRIAR uma instância de LoginFirebase
+  final LoginFirebase _loginFirebase = LoginFirebase();
 
   // Função para determinar a cor do card com base no status da mesa
   Color _getMesaColor(String status) {
     switch (status) {
       case 'Ocupada':
-      case 'Em Uso': 
+      case 'Em Uso':
         return Cores.primaryRed.withOpacity(0.5);
       case 'Reservada':
         return Cores.lightRed.withOpacity(0.5);
@@ -41,7 +45,7 @@ class _TelaHomeState extends State<TelaHome> {
           context,
           MaterialPageRoute(
             // Passa a mesa para a próxima tela
-            builder: (context) => TelaGerenciarMesa(mesa: mesa), 
+            builder: (context) => TelaGerenciarMesa(mesa: mesa),
           ),
         );
       },
@@ -74,10 +78,7 @@ class _TelaHomeState extends State<TelaHome> {
               ),
               child: Text(
                 mesa.status,
-                style: TextStyle(
-                  color: Cores.textWhite,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Cores.textWhite, fontSize: 12),
               ),
             ),
           ],
@@ -91,25 +92,46 @@ class _TelaHomeState extends State<TelaHome> {
     return Scaffold(
       backgroundColor: Cores.backgroundBlack,
       appBar: AppBar(
-        // Removendo a BarraLateral e usando um AppBar simples para o título
         title: const Text(
-          'Visão Geral do Estabelecimento - FlowOrder',
+          'Visão Geral de Mesas',
           style: TextStyle(
             color: Cores.textWhite,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
-        automaticallyImplyLeading: false, // Remove a seta de voltar se for a rota principal
+        automaticallyImplyLeading:
+            false, // Remove a seta de voltar se for a rota principal
         backgroundColor: Cores.cardBlack, // Fundo do AppBar
         actions: [
-          // Exemplo de botão de Logout (opcional)
+          // Botão de Logout
           IconButton(
             icon: const Icon(Icons.exit_to_app, color: Cores.primaryRed),
-            onPressed: () {
-              // TODO: Implementar a lógica de Logout aqui
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ação de Logout (Para ser implementada)!')));
+            // 3. IMPLEMENTAR a lógica de Logout
+            onPressed: () async {
+              try {
+                // Chama o método de logout do Firebase
+                await _loginFirebase.logout();
+
+                // Navega para a tela de login e remove a TelaHome da pilha
+                // Assumindo que a rota de login é '/' (ou você pode usar '/login' se for o nome configurado)
+                Navigator.pushReplacementNamed(context, '/');
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Sessão encerrada com sucesso!'),
+                    backgroundColor: Colors.green, // Cor de sucesso
+                  ),
+                );
+              } catch (e) {
+                // Trata possíveis erros que possam ocorrer durante o logout
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erro ao fazer logout: ${e.toString()}'),
+                    backgroundColor: Colors.red, // Cor de erro
+                  ),
+                );
+              }
             },
           ),
           const SizedBox(width: 20),
@@ -129,39 +151,46 @@ class _TelaHomeState extends State<TelaHome> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             Expanded(
               child: StreamBuilder<List<Mesa>>(
                 stream: _mesaController.listarMesasTempoReal(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
-                        child: CircularProgressIndicator(color: Cores.primaryRed));
+                      child: CircularProgressIndicator(color: Cores.primaryRed),
+                    );
                   }
 
                   if (snapshot.hasError) {
                     return Center(
-                        child: Text('Erro ao carregar mesas: ${snapshot.error}',
-                            style: TextStyle(color: Cores.primaryRed)));
+                      child: Text(
+                        'Erro ao carregar mesas: ${snapshot.error}',
+                        style: TextStyle(color: Cores.primaryRed),
+                      ),
+                    );
                   }
 
                   final mesas = snapshot.data ?? [];
 
                   if (mesas.isEmpty) {
                     return const Center(
-                      child: Text('Nenhuma mesa cadastrada.',
-                          style: TextStyle(color: Cores.textGray)),
+                      child: Text(
+                        'Nenhuma mesa cadastrada.',
+                        style: TextStyle(color: Cores.textGray),
+                      ),
                     );
                   }
 
                   // Layout de Grid para as Mesas
                   return GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 5, // Número de colunas
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.0, // Cards quadrados
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5, // Número de colunas
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 1.0, // Cards quadrados
+                        ),
                     itemCount: mesas.length,
                     itemBuilder: (context, index) {
                       return _buildMesaCard(context, mesas[index]);
