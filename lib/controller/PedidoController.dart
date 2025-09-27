@@ -1,10 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../firebase/PedidoFirebase.dart';
-import '../firebase/MesaFirebase.dart'; // Importação para controlar o status da mesa
+import '../firebase/MesaFirebase.dart';
 import '../models/Pedido.dart';
 
 class PedidoController {
-  // Inicializa a camada de serviço do Pedido e da Mesa
   final PedidoFirebase _pedidoFirebase = PedidoFirebase();
   final MesaFirebase _mesaFirebase = MesaFirebase();
 
@@ -16,45 +15,46 @@ class PedidoController {
   /// Cadastra um novo pedido no Firestore e atualiza o status da mesa
   Future<String> cadastrarPedido(Pedido pedido) async {
     try {
-      // Validações
+      // Validações: Agora lança exceção para melhor tratamento na View
       if (pedido.itens.isEmpty) {
-        return 'Erro: O pedido deve ter pelo menos um item.';
+        throw Exception('O pedido deve ter pelo menos um item.');
       }
       if (pedido.mesaUid == null || pedido.mesaUid!.isEmpty) {
-        return 'Erro: O pedido deve estar associado a uma mesa.';
+        throw Exception('O pedido deve estar associado a uma mesa.');
       }
 
       // 1. Obter o UID do Gerente e aplicar ao pedido
       String? gerenteUid = await _getGerenteUid();
       if (gerenteUid == null) {
-        return 'Erro: Usuário não logado ou gerente não encontrado.';
+        throw Exception('Usuário não logado ou gerente não encontrado.');
       }
       pedido.gerenteUid = gerenteUid;
 
       // 2. Definir o status inicial e horário
-      pedido.statusAtual = 'Aberto';
+      pedido.statusAtual = 'Pendente'; // Status inicial de um novo pedido
       pedido.horario = Timestamp.now();
 
-      // 3. Enviar o pedido para o Firebase
+      // 3. Cadastrar o pedido (pega o uid gerado)
       String pedidoId = await _pedidoFirebase.adicionarPedido(pedido);
-      pedido.uid = pedidoId;
 
-      // 4. Atualizar o status da Mesa para 'Ocupada'
+      // 4. Mudar o status da mesa para 'Ocupada' (se já não estiver)
       await _mesaFirebase.atualizarStatusMesa(
-          gerenteUid,
-          pedido.mesaUid!,
-          'Ocupada'
+        gerenteUid,
+        pedido.mesaUid!,
+        'Ocupada',
       );
 
-      return 'Pedido cadastrado com sucesso: $pedidoId';
+      return 'success'; // Retorna sucesso
     } catch (e) {
       print('Erro ao cadastrar pedido: $e');
-      return 'Erro ao cadastrar pedido: ${e.toString()}';
+      throw Exception(
+        'Erro ao cadastrar pedido: ${e.toString()}',
+      ); // Lança a exceção
     }
   }
 
-  /// Lista pedidos em tempo real (Stream)
-  Stream<List<Pedido>> listarPedidosTempoReal() async* {
+  /// **NOVO**: Lista pedidos ativos em tempo real para uma mesa específica (Stream)
+  Stream<List<Pedido>> listarPedidosTempoRealPorMesa(String mesaUid) async* {
     String? gerenteUid = await _getGerenteUid();
 
     if (gerenteUid == null) {
@@ -62,8 +62,8 @@ class PedidoController {
       return;
     }
 
-    // Chama o serviço do Firebase com o UID do gerente
-    yield* _pedidoFirebase.listarPedidosTempoReal(gerenteUid);
+    // Chama o serviço do Firebase com o UID do gerente e da mesa
+    yield* _pedidoFirebase.listarPedidosTempoRealPorMesa(gerenteUid, mesaUid);
   }
 
   /// Atualiza o status de um pedido e gerencia o status da mesa
@@ -73,20 +73,23 @@ class PedidoController {
 
       // Lógica para liberar a mesa quando o pedido é finalizado ou cancelado
       if (novoStatus == 'Entregue' || novoStatus == 'Cancelado') {
-          final pedido = await _pedidoFirebase.buscarPedidoPorId(pedidoId);
-          if (pedido != null && pedido.mesaUid != null) {
-              String? gerenteUid = await _getGerenteUid();
-              if (gerenteUid != null) {
-                  // Mudar o status da mesa de volta para 'Livre'
-                  await _mesaFirebase.atualizarStatusMesa(gerenteUid, pedido.mesaUid!, 'Livre');
-              }
+        final pedido = await _pedidoFirebase.buscarPedidoPorId(pedidoId);
+        if (pedido != null && pedido.mesaUid != null) {
+          String? gerenteUid = await _getGerenteUid();
+          if (gerenteUid != null) {
+            // TODO: Lógica futura para verificar se não há outros pedidos ATIVOS
+            // Antes de mudar o status da mesa para 'Livre'
+            // Por enquanto, apenas atualiza o status. A mesa será liberada na tela de pagamento
+            // await _mesaFirebase.atualizarStatusMesa(gerenteUid, pedido.mesaUid!, 'Livre');
           }
+        }
       }
 
       return true;
     } catch (e) {
-      print('Erro ao mudar status do pedido: $e');
-      return false;
+      throw Exception('Erro ao mudar status do pedido: ${e.toString()}');
     }
   }
+
+  // TODO: Adicionar métodos de buscar relatórios, etc.
 }

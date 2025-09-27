@@ -1,5 +1,3 @@
-// lib/firebase/MesaFirebase.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/Mesa.dart';
@@ -122,13 +120,17 @@ class MesaFirebase {
   }
 
   Future<void> atualizarStatusMesa(
-      String gerenteId,
-      String mesaUid,
-      String novoStatus,
-      ) async {
-    await _firestore.collection('Mesas').doc(mesaUid).update({
-      'status': novoStatus,
-      'atualizadoEm': FieldValue.serverTimestamp(),
-    });
+    String gerenteId,
+    String mesaUid,
+    String novoStatus,
+  ) async {
+    try {
+      await _firestore.collection('Mesas').doc(mesaUid).update({
+        'status': novoStatus,
+        'atualizadoEm': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Erro ao atualizar status da mesa $mesaUid: $e');
+    }
   }
 }

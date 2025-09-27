@@ -60,13 +60,6 @@ class FlowOrderGarcomApp extends StatelessWidget {
           case '/home':
             return MaterialPageRoute(builder: (context) => const TelaHome());
 
-          case '/criarPedido':
-            // 'Mesa' agora é reconhecida
-            final args = settings.arguments as Mesa;
-            return MaterialPageRoute(
-              builder: (context) => TelaCriarPedido(mesa: args),
-            );
-
           default:
             return MaterialPageRoute(builder: (context) => Tela_Login());
         }

@@ -36,141 +36,57 @@ class PedidoFirebase {
   }
 
   /// Busca todos os pedidos de uma vez (sem tempo real)
-  Future<List<Pedido>> buscarTodosPedidos(String gerenteUid) async {
+  Future<List<Pedido>> buscarPedidos() async {
     try {
-      final snapshot = await _pedidosRef.where('gerenteUid', isEqualTo: gerenteUid).get();
+      final snapshot = await _pedidosRef.get();
       return snapshot.docs
           .map((doc) => Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     } catch (e) {
-      throw Exception('Erro ao buscar todos os pedidos: $e');
+      throw Exception('Erro ao buscar pedidos: $e');
     }
   }
 
-  /// Busca pedidos em tempo real (stream)
+  /// Lista pedidos em tempo real (Stream)
   Stream<List<Pedido>> listarPedidosTempoReal(String gerenteUid) {
     return _pedidosRef
         .where('gerenteUid', isEqualTo: gerenteUid)
-        // Ordena por horário decrescente para os pedidos mais recentes aparecerem primeiro
-        .orderBy('horario', descending: true) 
+        .where(
+          'statusAtual',
+          whereIn: ['Aberto', 'Pendente', 'Preparando', 'Pronto'],
+        ) // Lista apenas pedidos ativos
+        .orderBy('horario', descending: true)
         .snapshots()
-        .map((snapshot) {
-      // Converte a QuerySnapshot do Firestore para List<Pedido>
-      return snapshot.docs.map((doc) {
-        return Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
-    });
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+            .toList());
   }
 
-  Future<void> editarPedido(String uid, Map<String, dynamic> dadosAtualizados) async {
-    await _pedidosRef.doc(uid).update(dadosAtualizados);
+  /// **NOVO**: Lista pedidos em tempo real de uma mesa (apenas 'Aberto', 'Pendente', 'Preparando')
+  Stream<List<Pedido>> listarPedidosTempoRealPorMesa(String gerenteUid, String mesaUid) {
+    // Filtra por gerente, mesa e status, excluindo 'Entregue' e 'Cancelado'
+    return _pedidosRef
+        .where('gerenteUid', isEqualTo: gerenteUid)
+        .where('mesaUid', isEqualTo: mesaUid)
+        .where(
+          'statusAtual',
+          whereIn: ['Aberto', 'Pendente', 'Preparando', 'Pronto'], // Status considerados ativos na comanda
+        )
+        .orderBy('horario', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList());
   }
 
-  Future<List<Pedido>> buscarPedidosDoDia(DateTime dia) async {
-    try {
-      final inicio = DateTime(dia.year, dia.month, dia.day, 0, 0, 0);
-      final fim = DateTime(dia.year, dia.month, dia.day, 23, 59, 59);
-
-      final snapshot = await _pedidosRef
-          .where('horario', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-          .where('horario', isLessThanOrEqualTo: Timestamp.fromDate(fim))
-          .get();
-
-      return snapshot.docs
-          .map((doc) => Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<List<Pedido>> buscarPedidosPorPeriodo(DateTime inicio, DateTime fim) async {
-    try {
-      final snapshot = await _pedidosRef
-          .where('horario', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-          .where('horario', isLessThanOrEqualTo: Timestamp.fromDate(fim))
-          .get();
-
-      return snapshot.docs
-          .map((doc) => Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<Map<String, dynamic>> buscarDetalhePagamento(String pedidoUid) async {
-    try {
-      final snapshot = await _pedidosRef.doc(pedidoUid).collection('Pagamentos').get();
-      double valorPago = 0.0;
-      String metodoPagamento = 'Outro';
-
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data();
-        valorPago = (data['valor'] as num).toDouble();
-        metodoPagamento = data['metodo'] as String;
-      }
-
-      return {
-        'valorPago': valorPago,
-        'metodoPagamento': metodoPagamento,
-      };
-    } catch (e) {
-      return {'valorPago': 0.0, 'metodoPagamento': 'Outro'};
-    }
-  }
-
-  Future<Map<String, dynamic>> calcularTotaisPorMetodoPagamento(
-      DateTime inicio, DateTime fim) async {
-    try {
-      final pedidos = await buscarPedidosPorPeriodo(inicio, fim);
-      final totalPorMetodo = <String, double>{
-        'Dinheiro': 0.0,
-        'Cartão': 0.0,
-        'PIX': 0.0,
-        'Outro': 0.0,
-      };
-      final quantidadePorMetodo = <String, int>{
-        'Dinheiro': 0,
-        'Cartão': 0,
-        'PIX': 0,
-        'Outro': 0,
-      };
-
-      for (var pedido in pedidos) {
-        if (pedido.uid != null) {
-          final detalhe = await buscarDetalhePagamento(pedido.uid!);
-          final valor = (detalhe['valorPago'] as num).toDouble();
-          final metodo = detalhe['metodoPagamento'] as String? ?? 'Outro';
-
-          totalPorMetodo[metodo] = (totalPorMetodo[metodo] ?? 0) + valor;
-          quantidadePorMetodo[metodo] = (quantidadePorMetodo[metodo] ?? 0) + 1;
-        }
-      }
-
-      return {
-        'totalPorMetodo': totalPorMetodo,
-        'quantidadePorMetodo': quantidadePorMetodo,
-      };
-    } catch (e) {
-      return {
-        'totalPorMetodo': {'Dinheiro': 0.0, 'Cartão': 0.0, 'PIX': 0.0, 'Outro': 0.0},
-        'quantidadePorMetodo': {'Dinheiro': 0, 'Cartão': 0, 'PIX': 0, 'Outro': 0},
-      };
-    }
-  }
-
+  /// **NOVO**: Busca um pedido por ID (necessário para atualizar o status da mesa)
   Future<Pedido?> buscarPedidoPorId(String pedidoId) async {
     try {
-      // _pedidosRef é a CollectionReference já definida na classe
       final doc = await _pedidosRef.doc(pedidoId).get();
-      if (!doc.exists) return null;
-      // Reutiliza o factory constructor do Pedido
-      return Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-    } catch (e) {
-      print('Erro ao buscar pedido por ID: $e');
+      if (doc.exists) {
+        return Pedido.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }
       return null;
+    } catch (e) {
+      throw Exception('Erro ao buscar pedido por ID: $e');
     }
   }
-
 }

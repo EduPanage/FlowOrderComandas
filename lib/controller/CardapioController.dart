@@ -30,46 +30,44 @@ class CardapioController {
     }
   }
 
-  /// Buscar cardápios do gerente logado (snapshot único)
   Future<List<Cardapio>> buscarCardapios() async {
     String? userId = await _cardapioFirebase.verificarGerenteUid();
     if (userId == null) {
-      throw Exception('Erro: Nenhum Gerente logado');
+      return []; // Retorna lista vazia se não houver gerente
     }
 
     try {
-      QuerySnapshot snapshot = await _cardapioFirebase.buscarCardapios(userId);
+      // 1. AWAIT para obter o QuerySnapshot
+      final snapshot = await _cardapioFirebase.buscarCardapios(userId);
+
+      // 2. CONVERTER o QuerySnapshot para List<Cardapio> usando o método de conversão
       return _cardapioFirebase.querySnapshotParaCardapios(snapshot);
     } catch (e) {
       throw Exception('Erro ao buscar cardápios: ${e.toString()}');
     }
   }
 
-  /// Buscar apenas cardápios ativos
-  Future<List<Cardapio>> buscarCardapiosAtivos() async {
-    String? userId = await _cardapioFirebase.verificarGerenteUid();
-    if (userId == null) {
-      throw Exception('Erro: Nenhum Gerente logado');
+  Stream<List<ItemCardapio>> listarItensCardapioTempoReal() async* {
+    // Obter GerenteUid (boa prática)
+    String? gerenteUid = await _cardapioFirebase.verificarGerenteUid();
+
+    if (gerenteUid == null) {
+      // Se não houver gerenteId, retornamos um stream vazio
+      yield* Stream.value([]);
+      return;
     }
 
-    try {
-      QuerySnapshot snapshot = await _cardapioFirebase.buscarCardapiosAtivos(
-        userId,
-      );
-      return _cardapioFirebase.querySnapshotParaCardapios(snapshot);
-    } catch (e) {
-      throw Exception('Erro ao buscar cardápios ativos: ${e.toString()}');
-    }
+    // Chama o serviço do Firebase (que já faz o filtro de gerente e ativo)
+    yield* _cardapioFirebase.listarItensCardapioTempoReal();
   }
 
   /// Atualizar cardápio
   Future<String> atualizarCardapio(Cardapio cardapio) async {
-    String? userId = await _cardapioFirebase.verificarGerenteUid();
+    String? userId = await _cardapioFirebase.pegarIdUsuarioLogado();
     if (userId == null) {
       throw Exception('Erro: Nenhum Gerente logado');
     }
-
-    if (cardapio.uid == null || cardapio.uid!.isEmpty) {
+    if (cardapio.uid == null) {
       throw Exception('UID do cardápio é necessário para atualizar');
     }
 
@@ -109,11 +107,7 @@ class CardapioController {
           ? 'Cardápio suspenso com sucesso'
           : 'Cardápio reativado com sucesso';
     } catch (e) {
-      throw Exception('Erro ao suspender/reativar cardápio: ${e.toString()}');
+      throw Exception('Erro ao suspender/reativar cardápio:');
     }
-  }
-
-  Stream<List<ItemCardapio>> listarItensAtivosTempoReal() {
-    return _cardapioFirebase.listarItensCardapioTempoReal();
   }
 }

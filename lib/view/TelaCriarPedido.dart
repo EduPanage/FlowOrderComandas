@@ -1,172 +1,307 @@
 import 'package:flutter/material.dart';
 import '../auxiliar/Cores.dart';
 import '../models/Mesa.dart';
-import '../controller/CardapioController.dart'; 
+import '../controller/CardapioController.dart';
 import '../controller/PedidoController.dart';
 import '../models/ItemCardapio.dart';
+import '../models/ItemPedido.dart';
 import '../models/Pedido.dart';
 
 class TelaCriarPedido extends StatefulWidget {
   final Mesa mesa;
+  final TabController tabController;
 
-  // A mesa é obrigatória para esta tela
-  const TelaCriarPedido({required this.mesa, super.key});
+  const TelaCriarPedido({
+    required this.mesa,
+    required this.tabController,
+    super.key,
+  });
 
   @override
   State<TelaCriarPedido> createState() => _TelaCriarPedidoState();
 }
 
 class _TelaCriarPedidoState extends State<TelaCriarPedido> {
+  final CardapioController _cardapioController = CardapioController();
+  final PedidoController _pedidoController = PedidoController();
 
-  final List<Map<String, dynamic>> _mockItensCardapio = [
-    {'nome': 'Cheeseburger Clássico', 'preco': 25.00, 'uid': '1'},
-    {'nome': 'Batata Frita Grande', 'preco': 15.00, 'uid': '2'},
-    {'nome': 'Coca-Cola (Lata)', 'preco': 6.00, 'uid': '3'},
-    {'nome': 'Pizza Margherita', 'preco': 45.00, 'uid': '4'},
-    {'nome': 'Água Mineral', 'preco': 4.00, 'uid': '5'},
-  ];
+  // Lista de itens que o garçom adicionou ao pedido atual (uid do item e quantidade)
+  Map<String, int> _itensNoCarrinho = {};
+  String _filtroBusca = '';
+  final TextEditingController _searchController = TextEditingController();
 
-  // Lista de itens que o garçom adicionou ao pedido atual
-  List<Map<String, dynamic>> _itensPedido = [];
-  
-  // Função de exemplo para adicionar um item ao pedido
-  void _adicionarItem(Map<String, dynamic> item) {
+  void _atualizarQuantidade(ItemCardapio item, {bool isIncrement = true}) {
     setState(() {
-      _itensPedido.add(item);
+      final String uid = item.uid;
+
+      if (isIncrement) {
+        _itensNoCarrinho.update(
+          uid,
+          (quantidade) => quantidade + 1,
+          ifAbsent: () => 1,
+        );
+      } else {
+        if (_itensNoCarrinho.containsKey(uid) && _itensNoCarrinho[uid]! > 1) {
+          _itensNoCarrinho.update(uid, (quantidade) => quantidade - 1);
+        } else {
+          _itensNoCarrinho.remove(uid);
+        }
+      }
     });
   }
 
-  // Função de exemplo para remover um item
-  void _removerItem(int index) {
-    setState(() {
-      _itensPedido.removeAt(index);
-    });
+  // Retorna a quantidade atual do item no carrinho
+  int _getQuantidade(String uid) {
+    return _itensNoCarrinho[uid] ?? 0;
   }
-  
-  // Função para calcular o total do pedido
+
+  // Calcula o total do pedido em tempo real
   double get _totalPedido {
-    return _itensPedido.fold(0.0, (sum, item) => sum + item['preco']);
+    // Cálculo simplificado: usaremos o cálculo no _salvarPedido com o Cardapio completo
+    return 0.0;
   }
 
-  // Lógica de salvar o pedido (substitua pela sua chamada ao PedidoController)
-  void _salvarPedido() {
-    if (_itensPedido.isEmpty) {
+  // Salva o pedido no Firestore
+  Future<void> _salvarPedido(List<ItemCardapio> cardapioCompleto) async {
+    if (_itensNoCarrinho.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Adicione itens ao pedido antes de salvar!')),
+        const SnackBar(content: Text('Adicione pelo menos um item ao pedido!')),
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Pedido para Mesa ${widget.mesa.numero} salvo. Total: R\$ ${_totalPedido.toStringAsFixed(2)}'),
-        backgroundColor: Colors.green,
+    try {
+      // 1. Criar a lista de ItemPedido a partir do Carrinho e do Cardápio Completo
+      List<ItemPedido> itensParaPedido = [];
+      double totalCalculado = 0.0;
+
+      for (var entry in _itensNoCarrinho.entries) {
+        final String itemUid = entry.key;
+        final int quantidade = entry.value;
+
+        // Encontra o ItemCardapio original para pegar nome e preço corretos
+        final itemCardapio = cardapioCompleto.firstWhere(
+          (item) => item.uid == itemUid,
+          orElse: () =>
+              throw Exception('Item do cardápio não encontrado: $itemUid'),
+        );
+
+        // Chamada correta: uid agora é um parâmetro obrigatório em ItemPedido
+        final itemPedido = ItemPedido(
+          uid: itemCardapio.uid,
+          nome: itemCardapio.nome,
+          preco: itemCardapio.preco,
+          quantidade: quantidade,
+          observacoes: '', // Implementação futura de observações
+        );
+
+        itensParaPedido.add(itemPedido);
+        totalCalculado += itemPedido.preco * itemPedido.quantidade;
+      }
+
+      // 2. Criar o objeto Pedido
+      final novoPedido = Pedido(
+        mesaUid: widget.mesa.uid,
+        nomeMesa: widget.mesa.nome,
+        total:
+            totalCalculado, // Usamos o total calculado para evitar erros de ponto flutuante
+        itens: itensParaPedido,
+      );
+
+      // 3. Enviar o pedido para o Controller
+      await _pedidoController.cadastrarPedido(novoPedido);
+
+      // Sucesso
+      setState(() {
+        _itensNoCarrinho.clear(); // Limpa o carrinho
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pedido enviado com sucesso para a mesa ${widget.mesa.numero}!',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // *** Mudar para a aba de Comanda Atual (index 0) ***
+      widget.tabController.animateTo(0);
+    } on Exception catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Cores.primaryRed,
+        ),
+      );
+    }
+  }
+
+  // Card que mostra um item do cardápio e os botões de + / -
+  Widget _buildItemCardapio(ItemCardapio item) {
+    final quantidade = _getQuantidade(item.uid);
+    final bool estaNoCarrinho = quantidade > 0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Cores.cardBlack,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: estaNoCarrinho ? Cores.primaryRed : Cores.borderGray,
+          width: estaNoCarrinho ? 2.0 : 1.0,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            // Informações do Item
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.nome,
+                    style: const TextStyle(
+                      color: Cores.textWhite,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'R\$ ${item.preco.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Botões de Quantidade
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Botão de Diminuir
+                IconButton(
+                  icon: Icon(
+                    Icons.remove_circle,
+                    color: quantidade > 0 ? Cores.primaryRed : Cores.textGray,
+                  ),
+                  onPressed: quantidade > 0
+                      ? () => _atualizarQuantidade(item, isIncrement: false)
+                      : null,
+                ),
+
+                // Contador de Quantidade
+                Container(
+                  width: 30,
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$quantidade',
+                    style: const TextStyle(
+                      color: Cores.textWhite,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+
+                // Botão de Aumentar
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Colors.green),
+                  onPressed: () =>
+                      _atualizarQuantidade(item, isIncrement: true),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
-    
-    // Volta para a tela de seleção de mesas
-    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Cores.backgroundBlack,
-      appBar: AppBar(
-        title: Text('Novo Pedido - Mesa ${widget.mesa.numero}',
-            style: TextStyle(color: Cores.textWhite)),
-        backgroundColor: Cores.cardBlack,
-        elevation: 4,
-      ),
-      body: Row(
-        children: [
-          // COLUNA ESQUERDA: LISTA DE PRODUTOS (Cardápio)
-          Expanded(
-            flex: 2,
-            child: Container(
-              color: Cores.backgroundBlack,
-              child: _buildCardapioLista(),
-            ),
-          ),
-          
-          // COLUNA DIREITA: PEDIDO ATUAL
-          Expanded(
-            flex: 1,
-            child: Container(
-              color: Cores.cardBlack, // Cor de fundo do painel do pedido
-              child: _buildPedidoPainel(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // =========================================================================
-  // Cardápio
-  // =========================================================================
-
-  Widget _buildCardapioLista() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _mockItensCardapio.length,
-      itemBuilder: (context, index) {
-        final item = _mockItensCardapio[index];
-        return Card(
-          color: Cores.backgroundBlack,
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(item['nome'], style: TextStyle(color: Cores.textWhite, fontWeight: FontWeight.bold)),
-            subtitle: Text('R\$ ${item['preco'].toStringAsFixed(2)}', style: TextStyle(color: Cores.textGray)),
-            trailing: IconButton(
-              icon: Icon(Icons.add_circle, color: Cores.primaryRed, size: 30),
-              onPressed: () => _adicionarItem(item),
-            ),
-            // Adicione uma linha divisória para melhor visualização
-            shape: Border(bottom: BorderSide(color: Cores.borderGray.withOpacity(0.5))),
-          ),
-        );
-      },
-    );
-  }
-
-  // =========================================================================
-  // Painel do Pedido
-  // =========================================================================
-
-  Widget _buildPedidoPainel() {
     return Column(
       children: [
+        // Campo de Busca
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'Itens do Pedido',
-            style: TextStyle(color: Cores.textWhite, fontSize: 22, fontWeight: FontWeight.bold),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _filtroBusca = value.toLowerCase();
+              });
+            },
+            style: const TextStyle(color: Cores.textWhite),
+            decoration: InputDecoration(
+              hintText: 'Buscar item no cardápio...',
+              hintStyle: TextStyle(color: Cores.textGray),
+              prefixIcon: const Icon(Icons.search, color: Cores.primaryRed),
+              filled: true,
+              fillColor: Cores.cardBlack,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
           ),
         ),
+
+        // Lista de Itens do Cardápio em Tempo Real
         Expanded(
-          child: _itensPedido.isEmpty
-              ? Center(child: Text('Nenhum item adicionado.', style: TextStyle(color: Cores.textGray)))
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _itensPedido.length,
-                  itemBuilder: (context, index) {
-                    final item = _itensPedido[index];
-                    return ListTile(
-                      title: Text(item['nome'], style: TextStyle(color: Cores.textWhite)),
-                      subtitle: Text('R\$ ${item['preco'].toStringAsFixed(2)}', style: TextStyle(color: Cores.textGray)),
-                      trailing: IconButton(
-                        icon: Icon(Icons.remove_circle_outline, color: Cores.lightRed),
-                        onPressed: () => _removerItem(index),
-                      ),
-                      dense: true,
-                    );
-                  },
-                ),
+          child: StreamBuilder<List<ItemCardapio>>(
+            stream: _cardapioController.listarItensCardapioTempoReal(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Cores.primaryRed),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Erro ao carregar cardápio: ${snapshot.error}',
+                    style: const TextStyle(color: Cores.primaryRed),
+                  ),
+                );
+              }
+
+              final cardapioCompleto = snapshot.data ?? [];
+
+              // Filtra a lista com base na busca
+              final listaFiltrada = cardapioCompleto.where((item) {
+                return item.nome.toLowerCase().contains(_filtroBusca);
+              }).toList();
+
+              if (listaFiltrada.isEmpty) {
+                return Center(
+                  child: Text(
+                    cardapioCompleto.isEmpty
+                        ? 'Nenhum item ativo no cardápio.'
+                        : 'Nenhum item encontrado para "$_filtroBusca".',
+                    style: TextStyle(color: Cores.textGray),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: listaFiltrada.length,
+                itemBuilder: (context, index) {
+                  return _buildItemCardapio(listaFiltrada[index]);
+                },
+              );
+            },
+          ),
         ),
-        
+
         // Área do Total e Botão Salvar
         Container(
           padding: const EdgeInsets.all(16),
@@ -181,21 +316,50 @@ class _TelaCriarPedidoState extends State<TelaCriarPedido> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total:', style: TextStyle(color: Cores.textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text('R\$ ${_totalPedido.toStringAsFixed(2)}', style: TextStyle(color: Cores.primaryRed, fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Itens no Carrinho:',
+                    style: TextStyle(
+                      color: Cores.textWhite,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '${_itensNoCarrinho.values.fold(0, (sum, current) => sum + current)} itens',
+                    style: const TextStyle(
+                      color: Cores.primaryRed,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _salvarPedido,
-                icon: const Icon(Icons.send),
-                label: const Text('Enviar Pedido'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Cores.primaryRed,
-                  foregroundColor: Cores.textWhite,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+              // StreamBuilder para garantir que tenhamos a lista de itens atualizada para o salvamento
+              StreamBuilder<List<ItemCardapio>>(
+                stream: _cardapioController.listarItensCardapioTempoReal(),
+                builder: (context, snapshot) {
+                  final cardapioCompleto = snapshot.data ?? [];
+
+                  return ElevatedButton.icon(
+                    onPressed: _itensNoCarrinho.isNotEmpty
+                        ? () =>
+                              _salvarPedido(
+                                cardapioCompleto,
+                              ) // Passa o cardápio completo para calcular preço na hora
+                        : null,
+                    icon: const Icon(Icons.send),
+                    label: const Text('Enviar Pedido'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Cores.primaryRed,
+                      foregroundColor: Cores.textWhite,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
