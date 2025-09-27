@@ -5,8 +5,8 @@ import 'package:floworder/controller/MesaController.dart';
 import 'package:floworder/models/Mesa.dart';
 import 'package:flutter/material.dart';
 import 'TelaGerenciarMesa.dart';
-// 1. IMPORTAR a classe LoginFirebase
 import '../firebase/LoginFirebase.dart';
+import '../auxiliar/WidgetAuxiliar.dart';
 
 class TelaHome extends StatefulWidget {
   const TelaHome({super.key});
@@ -17,73 +17,94 @@ class TelaHome extends StatefulWidget {
 
 class _TelaHomeState extends State<TelaHome> {
   final MesaController _mesaController = MesaController();
-  // 2. CRIAR uma instância de LoginFirebase
   final LoginFirebase _loginFirebase = LoginFirebase();
+  String _filtroStatus = 'Todos'; // Variável de estado para o filtro
 
-  // Função para determinar a cor do card com base no status da mesa
-  Color _getMesaColor(String status) {
-    switch (status) {
-      case 'Ocupada':
-      case 'Em Uso':
-        return Cores.primaryRed.withOpacity(0.5);
-      case 'Reservada':
-        return Cores.lightRed.withOpacity(0.5);
-      case 'Livre':
-      default:
-        return Cores.cardBlack;
-    }
+  // Função para construir o Chip de filtro
+  Widget _buildFilterChip(String status) {
+    final bool isSelected = _filtroStatus == status;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ChoiceChip(
+        label: Text(status),
+        selected: isSelected,
+        onSelected: (selected) {
+          if (selected) {
+            setState(() {
+              _filtroStatus = status;
+            });
+          }
+        },
+        selectedColor: Cores.primaryRed,
+        backgroundColor: Cores.cardBlack,
+        labelStyle: TextStyle(
+          color: isSelected ? Cores.textWhite : Cores.textGray,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isSelected ? Cores.primaryRed : Cores.borderGray,
+          ),
+        ),
+      ),
+    );
   }
 
-  // Card de mesa simplificado para a TelaHome
-  Widget _buildMesaCard(BuildContext context, Mesa mesa) {
-    final statusColor = _getMesaColor(mesa.status);
+  // Widget para exibir o sumário e os filtros
+  Widget _buildSummaryAndFilters(List<Mesa> mesas) {
+    final int totalMesas = mesas.length;
+    final int mesasOcupadas = mesas
+        .where((m) => m.status == 'Ocupada' || m.status == 'Em Uso')
+        .length;
+    final int mesasLivres = mesas.where((m) => m.status == 'Livre').length;
 
-    return InkWell(
-      onTap: () {
-        // Navega para a nova tela de gerenciamento da mesa
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            // Passa a mesa para a próxima tela
-            builder: (context) => TelaGerenciarMesa(mesa: mesa),
-          ),
-        );
-      },
-      child: Card(
-        color: statusColor,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Cores.borderGray, width: 1),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sumário Rápido
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(Icons.table_bar, color: Cores.textWhite, size: 40),
-            const SizedBox(height: 8),
             Text(
-              mesa.nome,
+              'Mesas Ocupadas: $mesasOcupadas',
               style: TextStyle(
-                color: Cores.textWhite,
+                color: Cores.primaryRed,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Cores.backgroundBlack.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
+            Text(
+              'Mesas Livres: $mesasLivres',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
-              child: Text(
-                mesa.status,
-                style: TextStyle(color: Cores.textWhite, fontSize: 12),
-              ),
+            ),
+            Text(
+              'Total: $totalMesas',
+              style: TextStyle(color: Cores.textWhite, fontSize: 18),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 16),
+
+        // Chips de Filtro de Status
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              _buildFilterChip('Todos'),
+              _buildFilterChip('Livre'),
+              _buildFilterChip('Ocupada'),
+              _buildFilterChip('Reservada'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
@@ -100,35 +121,29 @@ class _TelaHomeState extends State<TelaHome> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        automaticallyImplyLeading:
-            false, // Remove a seta de voltar se for a rota principal
-        backgroundColor: Cores.cardBlack, // Fundo do AppBar
+        automaticallyImplyLeading: false,
+        backgroundColor: Cores.cardBlack,
         actions: [
           // Botão de Logout
           IconButton(
             icon: const Icon(Icons.exit_to_app, color: Cores.primaryRed),
-            // 3. IMPLEMENTAR a lógica de Logout
             onPressed: () async {
               try {
-                // Chama o método de logout do Firebase
                 await _loginFirebase.logout();
 
-                // Navega para a tela de login e remove a TelaHome da pilha
-                // Assumindo que a rota de login é '/' (ou você pode usar '/login' se for o nome configurado)
                 Navigator.pushReplacementNamed(context, '/');
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Sessão encerrada com sucesso!'),
-                    backgroundColor: Colors.green, // Cor de sucesso
+                    backgroundColor: Colors.green,
                   ),
                 );
               } catch (e) {
-                // Trata possíveis erros que possam ocorrer durante o logout
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Erro ao fazer logout: ${e.toString()}'),
-                    backgroundColor: Colors.red, // Cor de erro
+                    backgroundColor: Colors.red,
                   ),
                 );
               }
@@ -139,67 +154,69 @@ class _TelaHomeState extends State<TelaHome> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Status das Mesas:',
-              style: TextStyle(
-                color: Cores.textGray,
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
+        child: StreamBuilder<List<Mesa>>(
+          stream: _mesaController.listarMesasTempoReal(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: Cores.primaryRed),
+              );
+            }
 
-            Expanded(
-              child: StreamBuilder<List<Mesa>>(
-                stream: _mesaController.listarMesasTempoReal(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: Cores.primaryRed),
-                    );
-                  }
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Erro ao carregar mesas: ${snapshot.error}',
+                  style: TextStyle(color: Cores.primaryRed),
+                ),
+              );
+            }
 
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Erro ao carregar mesas: ${snapshot.error}',
-                        style: TextStyle(color: Cores.primaryRed),
-                      ),
-                    );
-                  }
+            final mesas = snapshot.data ?? [];
 
-                  final mesas = snapshot.data ?? [];
+            // Aplica o filtro
+            final mesasFiltradas = mesas.where((mesa) {
+              if (_filtroStatus == 'Todos') return true;
+              if (_filtroStatus == 'Ocupada')
+                return mesa.status == 'Ocupada' || mesa.status == 'Em Uso';
+              return mesa.status == _filtroStatus;
+            }).toList();
 
-                  if (mesas.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'Nenhuma mesa cadastrada.',
-                        style: TextStyle(color: Cores.textGray),
-                      ),
-                    );
-                  }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Adiciona o sumário e filtros
+                _buildSummaryAndFilters(mesas),
 
-                  // Layout de Grid para as Mesas
-                  return GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5, // Número de colunas
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.0, // Cards quadrados
+                Expanded(
+                  child: mesasFiltradas.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Nenhuma mesa encontrada com o status "$_filtroStatus".',
+                            style: const TextStyle(color: Cores.textGray),
+                          ),
+                        )
+                      : GridView.builder(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 5, // Número de colunas
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                childAspectRatio: 1.0, // Cards quadrados
+                              ),
+                          itemCount: mesasFiltradas.length,
+                          itemBuilder: (context, index) {
+                            // Usa o widget do arquivo auxiliar
+                            return buildMesaCard(
+                              context,
+                              mesasFiltradas[index],
+                            );
+                          },
                         ),
-                    itemCount: mesas.length,
-                    itemBuilder: (context, index) {
-                      return _buildMesaCard(context, mesas[index]);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
